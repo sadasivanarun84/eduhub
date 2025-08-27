@@ -1,13 +1,77 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertWheelSectionSchema, insertSpinResultSchema } from "@shared/schema";
+import { insertWheelSectionSchema, insertSpinResultSchema, insertCampaignSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Campaign routes
+  app.get("/api/campaigns", async (req, res) => {
+    try {
+      const campaigns = await storage.getCampaigns();
+      res.json(campaigns);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch campaigns" });
+    }
+  });
+
+  app.get("/api/campaigns/active", async (req, res) => {
+    try {
+      const activeCampaign = await storage.getActiveCampaign();
+      if (!activeCampaign) {
+        return res.status(404).json({ message: "No active campaign found" });
+      }
+      res.json(activeCampaign);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch active campaign" });
+    }
+  });
+
+  app.get("/api/campaigns/:id", async (req, res) => {
+    try {
+      const campaign = await storage.getCampaign(req.params.id);
+      if (!campaign) {
+        return res.status(404).json({ message: "Campaign not found" });
+      }
+      res.json(campaign);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch campaign" });
+    }
+  });
+
+  app.post("/api/campaigns", async (req, res) => {
+    try {
+      const validatedData = insertCampaignSchema.parse(req.body);
+      const campaign = await storage.createCampaign(validatedData);
+      res.json(campaign);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid campaign data" });
+    }
+  });
+
+  app.put("/api/campaigns/:id", async (req, res) => {
+    try {
+      const updates = req.body;
+      const campaign = await storage.updateCampaign(req.params.id, updates);
+      res.json(campaign);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update campaign" });
+    }
+  });
+
+  app.delete("/api/campaigns/:id", async (req, res) => {
+    try {
+      await storage.deleteCampaign(req.params.id);
+      res.json({ message: "Campaign deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete campaign" });
+    }
+  });
+
   // Wheel sections routes
   app.get("/api/wheel-sections", async (req, res) => {
     try {
-      const sections = await storage.getWheelSections();
+      const campaignId = req.query.campaignId as string | undefined;
+      const sections = await storage.getWheelSections(campaignId);
       res.json(sections);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch wheel sections" });
@@ -16,6 +80,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/wheel-sections", async (req, res) => {
     try {
+      // Auto-assign to active campaign if not specified
+      if (!req.body.campaignId) {
+        const activeCampaign = await storage.getActiveCampaign();
+        if (activeCampaign) {
+          req.body.campaignId = activeCampaign.id;
+        }
+      }
       const validatedData = insertWheelSectionSchema.parse(req.body);
       const section = await storage.createWheelSection(validatedData);
       res.json(section);
@@ -35,7 +106,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/wheel-sections", async (req, res) => {
     try {
-      await storage.clearWheelSections();
+      const campaignId = req.query.campaignId as string | undefined;
+      await storage.clearWheelSections(campaignId);
       res.json({ message: "All sections cleared successfully" });
     } catch (error) {
       res.status(500).json({ message: "Failed to clear sections" });
@@ -45,7 +117,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Spin results routes
   app.get("/api/spin-results", async (req, res) => {
     try {
-      const results = await storage.getSpinResults();
+      const campaignId = req.query.campaignId as string | undefined;
+      const results = await storage.getSpinResults(campaignId);
       res.json(results);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch spin results" });
@@ -54,6 +127,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/spin-results", async (req, res) => {
     try {
+      // Auto-assign to active campaign if not specified
+      if (!req.body.campaignId) {
+        const activeCampaign = await storage.getActiveCampaign();
+        if (activeCampaign) {
+          req.body.campaignId = activeCampaign.id;
+        }
+      }
       const validatedData = insertSpinResultSchema.parse(req.body);
       const result = await storage.createSpinResult(validatedData);
       res.json(result);
@@ -64,7 +144,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/spin-results", async (req, res) => {
     try {
-      await storage.clearSpinResults();
+      const campaignId = req.query.campaignId as string | undefined;
+      await storage.clearSpinResults(campaignId);
       res.json({ message: "Spin history cleared successfully" });
     } catch (error) {
       res.status(500).json({ message: "Failed to clear spin history" });

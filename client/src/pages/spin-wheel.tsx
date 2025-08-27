@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { SpinningWheel } from "@/components/spinning-wheel";
 import { WheelControls } from "@/components/wheel-controls";
 import { ResultsPanel } from "@/components/results-panel";
+import { CampaignConfig } from "@/components/campaign-config";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { WheelSection } from "@shared/schema";
 
 export default function SpinWheelPage() {
@@ -30,13 +32,28 @@ export default function SpinWheelPage() {
 
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-          {/* Left Panel - Wheel Controls */}
+          {/* Left Panel - Wheel Controls & Campaign Settings */}
           <div className="lg:col-span-1 order-2 lg:order-1">
-            <WheelControls
-              sections={wheelSections}
-              isLoading={sectionsLoading}
-              onSectionsUpdate={refetchSections}
-            />
+            <Tabs defaultValue="wheel" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsTrigger value="wheel" data-testid="tab-wheel">
+                  🎯 Wheel
+                </TabsTrigger>
+                <TabsTrigger value="campaign" data-testid="tab-campaign">
+                  ⚙️ Campaign
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="wheel">
+                <WheelControls
+                  sections={wheelSections}
+                  isLoading={sectionsLoading}
+                  onSectionsUpdate={refetchSections}
+                />
+              </TabsContent>
+              <TabsContent value="campaign">
+                <CampaignConfig onCampaignUpdate={refetchSections} />
+              </TabsContent>
+            </Tabs>
           </div>
 
           {/* Center Panel - Spinning Wheel */}

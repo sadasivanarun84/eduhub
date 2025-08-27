@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type WheelSection, type InsertWheelSection, type SpinResult, type InsertSpinResult } from "@shared/schema";
+import { type User, type InsertUser, type WheelSection, type InsertWheelSection, type SpinResult, type InsertSpinResult, type Campaign, type InsertCampaign } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -6,40 +6,66 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   
+  // Campaigns
+  getCampaigns(): Promise<Campaign[]>;
+  getCampaign(id: string): Promise<Campaign | undefined>;
+  getActiveCampaign(): Promise<Campaign | undefined>;
+  createCampaign(campaign: InsertCampaign): Promise<Campaign>;
+  updateCampaign(id: string, updates: Partial<Campaign>): Promise<Campaign>;
+  deleteCampaign(id: string): Promise<void>;
+  
   // Wheel sections
-  getWheelSections(): Promise<WheelSection[]>;
+  getWheelSections(campaignId?: string): Promise<WheelSection[]>;
   createWheelSection(section: InsertWheelSection): Promise<WheelSection>;
   deleteWheelSection(id: string): Promise<void>;
-  clearWheelSections(): Promise<void>;
+  clearWheelSections(campaignId?: string): Promise<void>;
   
   // Spin results
-  getSpinResults(): Promise<SpinResult[]>;
+  getSpinResults(campaignId?: string): Promise<SpinResult[]>;
   createSpinResult(result: InsertSpinResult): Promise<SpinResult>;
-  clearSpinResults(): Promise<void>;
+  clearSpinResults(campaignId?: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
   private users: Map<string, User>;
+  private campaigns: Map<string, Campaign>;
   private wheelSections: Map<string, WheelSection>;
   private spinResults: Map<string, SpinResult>;
 
   constructor() {
     this.users = new Map();
+    this.campaigns = new Map();
     this.wheelSections = new Map();
     this.spinResults = new Map();
     
-    // Initialize with default wheel sections
-    this.initializeDefaultSections();
+    // Initialize with default campaign and wheel sections
+    this.initializeDefaults();
   }
 
-  private initializeDefaultSections() {
+  private initializeDefaults() {
+    // Create default campaign
+    const campaignId = randomUUID();
+    const defaultCampaign: Campaign = {
+      id: campaignId,
+      name: "Default Campaign",
+      totalAmount: null,
+      totalWinners: 100,
+      threshold: null,
+      currentSpent: 0,
+      currentWinners: 0,
+      isActive: true,
+      createdAt: new Date(),
+    };
+    this.campaigns.set(campaignId, defaultCampaign);
+
+    // Create default wheel sections
     const defaultSections = [
-      { text: 'Prize A', color: '#ef4444', order: 0 },
-      { text: 'Prize B', color: '#3b82f6', order: 1 },
-      { text: 'Prize C', color: '#22c55e', order: 2 },
-      { text: 'Prize D', color: '#eab308', order: 3 },
-      { text: 'Prize E', color: '#8b5cf6', order: 4 },
-      { text: 'Prize F', color: '#ec4899', order: 5 },
+      { text: 'Prize A', color: '#ef4444', amount: null, order: 0 },
+      { text: 'Prize B', color: '#3b82f6', amount: null, order: 1 },
+      { text: 'Prize C', color: '#22c55e', amount: null, order: 2 },
+      { text: 'Prize D', color: '#eab308', amount: null, order: 3 },
+      { text: 'Prize E', color: '#8b5cf6', amount: null, order: 4 },
+      { text: 'Prize F', color: '#ec4899', amount: null, order: 5 },
     ];
 
     defaultSections.forEach(section => {
@@ -47,6 +73,7 @@ export class MemStorage implements IStorage {
       const wheelSection: WheelSection = {
         ...section,
         id,
+        campaignId,
         createdAt: new Date(),
       };
       this.wheelSections.set(id, wheelSection);
@@ -70,8 +97,74 @@ export class MemStorage implements IStorage {
     return user;
   }
 
-  async getWheelSections(): Promise<WheelSection[]> {
-    return Array.from(this.wheelSections.values()).sort((a, b) => a.order - b.order);
+  // Campaign methods
+  async getCampaigns(): Promise<Campaign[]> {
+    return Array.from(this.campaigns.values()).sort(
+      (a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0)
+    );
+  }
+
+  async getCampaign(id: string): Promise<Campaign | undefined> {
+    return this.campaigns.get(id);
+  }
+
+  async getActiveCampaign(): Promise<Campaign | undefined> {
+    return Array.from(this.campaigns.values()).find(campaign => campaign.isActive);
+  }
+
+  async createCampaign(insertCampaign: InsertCampaign): Promise<Campaign> {
+    const id = randomUUID();
+    const campaign: Campaign = {
+      ...insertCampaign,
+      id,
+      currentSpent: 0,
+      currentWinners: 0,
+      isActive: true,
+      createdAt: new Date(),
+    };
+    this.campaigns.set(id, campaign);
+    return campaign;
+  }
+
+  async updateCampaign(id: string, updates: Partial<Campaign>): Promise<Campaign> {
+    const existing = this.campaigns.get(id);
+    if (!existing) {
+      throw new Error(`Campaign with id ${id} not found`);
+    }
+    const updated = { ...existing, ...updates };
+    this.campaigns.set(id, updated);
+    return updated;
+  }
+
+  async deleteCampaign(id: string): Promise<void> {
+    this.campaigns.delete(id);
+    // Also delete associated wheel sections and spin results
+    Array.from(this.wheelSections.entries()).forEach(([sectionId, section]) => {
+      if (section.campaignId === id) {
+        this.wheelSections.delete(sectionId);
+      }
+    });
+    Array.from(this.spinResults.entries()).forEach(([resultId, result]) => {
+      if (result.campaignId === id) {
+        this.spinResults.delete(resultId);
+      }
+    });
+  }
+
+  async getWheelSections(campaignId?: string): Promise<WheelSection[]> {
+    const sections = Array.from(this.wheelSections.values());
+    let targetCampaignId = campaignId;
+    
+    // If no campaignId provided, use the active campaign
+    if (!targetCampaignId) {
+      const activeCampaign = await this.getActiveCampaign();
+      targetCampaignId = activeCampaign?.id;
+    }
+    
+    const filtered = targetCampaignId 
+      ? sections.filter(section => section.campaignId === targetCampaignId)
+      : sections;
+    return filtered.sort((a, b) => a.order - b.order);
   }
 
   async createWheelSection(insertSection: InsertWheelSection): Promise<WheelSection> {
@@ -89,12 +182,32 @@ export class MemStorage implements IStorage {
     this.wheelSections.delete(id);
   }
 
-  async clearWheelSections(): Promise<void> {
-    this.wheelSections.clear();
+  async clearWheelSections(campaignId?: string): Promise<void> {
+    if (campaignId) {
+      Array.from(this.wheelSections.entries()).forEach(([sectionId, section]) => {
+        if (section.campaignId === campaignId) {
+          this.wheelSections.delete(sectionId);
+        }
+      });
+    } else {
+      this.wheelSections.clear();
+    }
   }
 
-  async getSpinResults(): Promise<SpinResult[]> {
-    return Array.from(this.spinResults.values()).sort(
+  async getSpinResults(campaignId?: string): Promise<SpinResult[]> {
+    const results = Array.from(this.spinResults.values());
+    let targetCampaignId = campaignId;
+    
+    // If no campaignId provided, use the active campaign
+    if (!targetCampaignId) {
+      const activeCampaign = await this.getActiveCampaign();
+      targetCampaignId = activeCampaign?.id;
+    }
+    
+    const filtered = targetCampaignId 
+      ? results.filter(result => result.campaignId === targetCampaignId)
+      : results;
+    return filtered.sort(
       (a, b) => (b.timestamp?.getTime() || 0) - (a.timestamp?.getTime() || 0)
     );
   }
@@ -107,11 +220,43 @@ export class MemStorage implements IStorage {
       timestamp: new Date(),
     };
     this.spinResults.set(id, result);
+    
+    // Update campaign statistics if campaignId is provided
+    if (insertResult.campaignId) {
+      const campaign = this.campaigns.get(insertResult.campaignId);
+      if (campaign) {
+        const updatedCampaign = {
+          ...campaign,
+          currentWinners: campaign.currentWinners + 1,
+          currentSpent: campaign.currentSpent + (insertResult.amount || 0),
+        };
+        this.campaigns.set(insertResult.campaignId, updatedCampaign);
+      }
+    }
+    
     return result;
   }
 
-  async clearSpinResults(): Promise<void> {
-    this.spinResults.clear();
+  async clearSpinResults(campaignId?: string): Promise<void> {
+    if (campaignId) {
+      Array.from(this.spinResults.entries()).forEach(([resultId, result]) => {
+        if (result.campaignId === campaignId) {
+          this.spinResults.delete(resultId);
+        }
+      });
+      // Reset campaign statistics
+      const campaign = this.campaigns.get(campaignId);
+      if (campaign) {
+        const updatedCampaign = {
+          ...campaign,
+          currentWinners: 0,
+          currentSpent: 0,
+        };
+        this.campaigns.set(campaignId, updatedCampaign);
+      }
+    } else {
+      this.spinResults.clear();
+    }
   }
 }
 

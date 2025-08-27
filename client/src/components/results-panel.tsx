@@ -2,8 +2,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import type { SpinResult } from "@shared/schema";
+import type { SpinResult, Campaign } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 
 interface ResultsPanelProps {
@@ -19,6 +21,12 @@ export function ResultsPanel({ currentResult }: ResultsPanelProps) {
     isLoading,
   } = useQuery<SpinResult[]>({
     queryKey: ["/api/spin-results"],
+  });
+
+  // Fetch active campaign for progress tracking
+  const { data: activeCampaign } = useQuery<Campaign>({
+    queryKey: ["/api/campaigns/active"],
+    retry: false,
   });
 
   const clearHistoryMutation = useMutation({
@@ -59,6 +67,87 @@ export function ResultsPanel({ currentResult }: ResultsPanelProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-8">
+        {/* Campaign Progress Display */}
+        {activeCampaign && (
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <span>📊</span>
+              Campaign Progress
+            </h3>
+            
+            <div className="bg-muted/50 rounded-lg p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium" data-testid="text-campaign-name">
+                  {activeCampaign.name}
+                </h4>
+                <Badge 
+                  variant={activeCampaign.threshold && (activeCampaign.currentSpent ?? 0) >= activeCampaign.threshold ? "default" : "secondary"}
+                  data-testid="badge-threshold-status"
+                >
+                  {activeCampaign.threshold && (activeCampaign.currentSpent ?? 0) >= activeCampaign.threshold 
+                    ? "🎯 Threshold Reached" 
+                    : "🔄 Random Mode"}
+                </Badge>
+              </div>
+
+              {/* Budget Progress */}
+              {activeCampaign.totalAmount && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Budget Spent</span>
+                    <span data-testid="text-budget-progress">
+                      ${(activeCampaign.currentSpent ?? 0).toFixed(2)} / ${activeCampaign.totalAmount.toFixed(2)}
+                    </span>
+                  </div>
+                  <Progress 
+                    value={((activeCampaign.currentSpent ?? 0) / activeCampaign.totalAmount) * 100} 
+                    className="h-2"
+                    data-testid="progress-budget"
+                  />
+                  <div className="text-xs text-muted-foreground">
+                    Remaining: ${(activeCampaign.totalAmount - (activeCampaign.currentSpent ?? 0)).toFixed(2)}
+                  </div>
+                </div>
+              )}
+
+              {/* Winners Progress */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Winners Count</span>
+                  <span data-testid="text-winners-progress">
+                    {activeCampaign.currentWinners ?? 0} / {activeCampaign.totalWinners}
+                  </span>
+                </div>
+                <Progress 
+                  value={((activeCampaign.currentWinners ?? 0) / activeCampaign.totalWinners) * 100} 
+                  className="h-2"
+                  data-testid="progress-winners"
+                />
+                <div className="text-xs text-muted-foreground">
+                  Remaining: {activeCampaign.totalWinners - (activeCampaign.currentWinners ?? 0)} winners
+                </div>
+              </div>
+
+              {/* Threshold Information */}
+              {activeCampaign.threshold && (
+                <div className="border-t pt-3 mt-3">
+                  <div className="flex justify-between text-sm">
+                    <span>Threshold Setting</span>
+                    <span data-testid="text-threshold-amount">
+                      ${activeCampaign.threshold.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {(activeCampaign.currentSpent ?? 0) >= activeCampaign.threshold 
+                      ? "✅ Intelligent prize distribution is now active"
+                      : "⏳ Random distribution until threshold is reached"}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Current Result Display */}
         <div>
           {!currentResult ? (

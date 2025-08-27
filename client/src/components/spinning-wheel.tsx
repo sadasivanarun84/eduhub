@@ -1,9 +1,9 @@
 import { useRef, useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import type { WheelSection } from "@shared/schema";
+import type { WheelSection, Campaign } from "@shared/schema";
 
 interface SpinningWheelProps {
   sections: WheelSection[];
@@ -17,12 +17,19 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
   const [spinDuration, setSpinDuration] = useState([3]);
   const queryClient = useQueryClient();
 
+  // Fetch active campaign for threshold logic
+  const { data: activeCampaign } = useQuery<Campaign>({
+    queryKey: ["/api/campaigns/active"],
+    retry: false,
+  });
+
   const recordSpinMutation = useMutation({
-    mutationFn: async (winner: string) => {
-      return apiRequest("POST", "/api/spin-results", { winner });
+    mutationFn: async (data: { winner: string; amount?: number }) => {
+      return apiRequest("POST", "/api/spin-results", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/spin-results"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns/active"] });
     },
   });
 
@@ -125,6 +132,96 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
     ctx.stroke();
   };
 
+  // Intelligent winner selection based on campaign threshold logic
+  const determineWinner = (finalRotation: number): WheelSection | null => {
+    if (sections.length === 0) return null;
+
+    // Check if we have campaign constraints
+    const hasCampaignConstraints = activeCampaign && 
+      activeCampaign.totalAmount && 
+      activeCampaign.threshold &&
+      sections.some(section => section.amount !== null);
+
+    if (!hasCampaignConstraints) {
+      // No campaign constraints - use traditional random selection
+      return getRandomWinner(finalRotation);
+    }
+
+    // Campaign with threshold logic
+    const campaign = activeCampaign!;
+    const sectionsWithAmounts = sections.filter(section => section.amount !== null);
+    const thresholdReached = campaign.currentSpent >= campaign.threshold!;
+
+    if (!thresholdReached) {
+      // Threshold not reached - random selection from all sections
+      return getRandomWinner(finalRotation);
+    }
+
+    // Threshold reached - controlled selection based on remaining budget
+    const remainingBudget = campaign.totalAmount! - campaign.currentSpent;
+    const remainingWinners = campaign.totalWinners - campaign.currentWinners;
+
+    if (remainingWinners <= 0) {
+      // No more winners allowed
+      return null;
+    }
+
+    // Find affordable prizes that fit within remaining budget
+    const affordablePrizes = sectionsWithAmounts.filter(section => 
+      (section.amount || 0) <= remainingBudget
+    );
+
+    if (affordablePrizes.length === 0) {
+      // No affordable prizes - check if there are any non-amount sections
+      const nonAmountSections = sections.filter(section => section.amount === null);
+      if (nonAmountSections.length > 0) {
+        return getRandomWinnerFromSections(nonAmountSections);
+      }
+      return null;
+    }
+
+    // Select from affordable prizes based on budget distribution strategy
+    return selectOptimalPrize(affordablePrizes, remainingBudget, remainingWinners);
+  };
+
+  // Traditional random selection based on wheel position
+  const getRandomWinner = (finalRotation: number): WheelSection => {
+    const pointerAngle = -Math.PI / 2;
+    const sectionAngle = (2 * Math.PI) / sections.length;
+    const angleFromSection0 = (pointerAngle - finalRotation + 2 * Math.PI) % (2 * Math.PI);
+    const winnerIndex = Math.floor(angleFromSection0 / sectionAngle);
+    return sections[winnerIndex];
+  };
+
+  // Random selection from a specific set of sections
+  const getRandomWinnerFromSections = (availableSections: WheelSection[]): WheelSection => {
+    const randomIndex = Math.floor(Math.random() * availableSections.length);
+    return availableSections[randomIndex];
+  };
+
+  // Optimal prize selection for controlled distribution
+  const selectOptimalPrize = (
+    affordablePrizes: WheelSection[], 
+    remainingBudget: number, 
+    remainingWinners: number
+  ): WheelSection => {
+    // Strategy: Try to distribute budget optimally across remaining winners
+    const averageBudgetPerWinner = remainingBudget / remainingWinners;
+    
+    // Find prizes close to the average budget per winner
+    const optimalPrizes = affordablePrizes.filter(section => {
+      const amount = section.amount || 0;
+      return amount <= averageBudgetPerWinner * 1.2; // Allow 20% variance
+    });
+
+    if (optimalPrizes.length > 0) {
+      return getRandomWinnerFromSections(optimalPrizes);
+    }
+
+    // Fallback to any affordable prize
+    return getRandomWinnerFromSections(affordablePrizes);
+  };
+
   const spinWheel = () => {
     if (isSpinning || sections.length === 0) return;
 
@@ -153,21 +250,16 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
         const finalRot = finalRotation % (2 * Math.PI);
         setCurrentRotation(finalRot);
 
-        // Determine winner
-        // The pointer is at the top of the wheel (-π/2 in canvas coordinates)
-        const pointerAngle = -Math.PI / 2;
-        const sectionAngle = (2 * Math.PI) / sections.length;
-        
-        // Find which section is currently at the pointer position
-        // Calculate the angle from section 0 to the pointer
-        const angleFromSection0 = (pointerAngle - finalRot + 2 * Math.PI) % (2 * Math.PI);
-        const winnerIndex = Math.floor(angleFromSection0 / sectionAngle);
-        const winner = sections[winnerIndex];
+        // Determine winner using intelligent selection
+        const winner = determineWinner(finalRot);
 
         if (winner) {
           setTimeout(() => {
             onSpinComplete(winner.text);
-            recordSpinMutation.mutate(winner.text);
+            recordSpinMutation.mutate({ 
+              winner: winner.text, 
+              amount: winner.amount || undefined 
+            });
             setIsSpinning(false);
           }, 500);
         } else {
