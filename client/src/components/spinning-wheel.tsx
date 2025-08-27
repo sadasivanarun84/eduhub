@@ -37,6 +37,33 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // Helper function to wrap text
+    const wrapText = (text: string, maxWidth: number): string[] => {
+      // Ensure text is a string
+      const textStr = String(text || '');
+      const words = textStr.split(' ');
+      const lines: string[] = [];
+      let currentLine = '';
+
+      for (let i = 0; i < words.length; i++) {
+        const testLine = currentLine + (currentLine ? ' ' : '') + words[i];
+        const testWidth = ctx.measureText(testLine).width;
+
+        if (testWidth > maxWidth && currentLine) {
+          lines.push(currentLine);
+          currentLine = words[i];
+        } else {
+          currentLine = testLine;
+        }
+      }
+
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+
+      return lines;
+    };
+
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
     const radius = Math.min(centerX, centerY) - 10;
@@ -62,7 +89,7 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      // Draw text
+      // Draw text with word wrapping
       ctx.save();
       ctx.translate(centerX, centerY);
       ctx.rotate(startAngle + anglePerSection / 2);
@@ -71,7 +98,20 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
       ctx.font = "bold 14px Inter";
       ctx.shadowColor = "rgba(0,0,0,0.5)";
       ctx.shadowBlur = 2;
-      ctx.fillText(section.text, radius * 0.6, 5);
+      
+      // Calculate available space for text
+      const availableWidth = radius * 0.35; // Leave more margin for readability
+      const lines = wrapText(section.text, availableWidth);
+      const lineHeight = 16;
+      const totalHeight = lines.length * lineHeight;
+      const startY = -(totalHeight / 2) + (lineHeight / 2);
+      
+      // Draw each line
+      lines.forEach((line, lineIndex) => {
+        const y = startY + (lineIndex * lineHeight);
+        ctx.fillText(line, radius * 0.5, y);
+      });
+      
       ctx.restore();
     });
 
