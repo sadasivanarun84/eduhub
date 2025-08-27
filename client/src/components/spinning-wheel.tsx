@@ -114,9 +114,14 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
         setCurrentRotation(finalRot);
 
         // Determine winner
-        const normalizedRotation = (2 * Math.PI - (finalRot % (2 * Math.PI))) % (2 * Math.PI);
+        // The pointer is at the top of the wheel (-π/2 in canvas coordinates)
+        const pointerAngle = -Math.PI / 2;
         const sectionAngle = (2 * Math.PI) / sections.length;
-        const winnerIndex = Math.floor(normalizedRotation / sectionAngle);
+        
+        // Find which section is currently at the pointer position
+        // Calculate the angle from section 0 to the pointer
+        const angleFromSection0 = (pointerAngle - finalRot + 2 * Math.PI) % (2 * Math.PI);
+        const winnerIndex = Math.floor(angleFromSection0 / sectionAngle);
         const winner = sections[winnerIndex];
 
         if (winner) {
