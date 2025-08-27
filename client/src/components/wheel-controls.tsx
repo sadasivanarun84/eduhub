@@ -92,6 +92,7 @@ export function WheelControls({ sections, isLoading, onSectionsUpdate }: WheelCo
         return apiRequest("POST", "/api/wheel-sections", {
           text: section.text,
           color: randomColor,
+          amount: section.amount, // Preserve existing amount
           order: index,
         });
       });
@@ -108,15 +109,31 @@ export function WheelControls({ sections, isLoading, onSectionsUpdate }: WheelCo
     },
   });
 
+  // Parse amount from text (e.g., "10k" -> 10000, "50" -> 50)
+  const parseAmount = (text: string): number | null => {
+    const trimmed = text.trim().toLowerCase();
+    const numMatch = trimmed.match(/^(\d+(?:\.\d+)?)(k)?$/);
+    
+    if (numMatch) {
+      const num = parseFloat(numMatch[1]);
+      const multiplier = numMatch[2] === 'k' ? 1000 : 1;
+      return Math.round(num * multiplier);
+    }
+    
+    return null;
+  };
+
   const handleAddSection = () => {
     if (!newSectionText.trim()) return;
     
     const randomColor = PREDEFINED_COLORS[Math.floor(Math.random() * PREDEFINED_COLORS.length)];
     const order = sections.length;
+    const amount = parseAmount(newSectionText.trim());
     
     addSectionMutation.mutate({
       text: newSectionText.trim(),
       color: randomColor,
+      amount,
       order,
     });
   };
@@ -140,7 +157,7 @@ export function WheelControls({ sections, isLoading, onSectionsUpdate }: WheelCo
         <div className="flex gap-2">
           <Input
             type="text"
-            placeholder="Enter section text..."
+            placeholder="Enter section text (e.g., 10k, 50, Better Luck Next Time)..."
             value={newSectionText}
             onChange={(e) => setNewSectionText(e.target.value)}
             onKeyPress={handleKeyPress}
@@ -181,6 +198,11 @@ export function WheelControls({ sections, isLoading, onSectionsUpdate }: WheelCo
                     style={{ backgroundColor: section.color }}
                   />
                   <span>{section.text}</span>
+                  {section.amount && (
+                    <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full">
+                      ${section.amount.toLocaleString()}
+                    </span>
+                  )}
                 </div>
                 <Button
                   variant="ghost"
