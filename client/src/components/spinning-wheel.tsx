@@ -190,27 +190,29 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
     const sectionAngle = (2 * Math.PI) / sections.length;
     const pointerAngle = -Math.PI / 2; // Pointer points up (top of circle)
     
-    // Calculate the midpoint of the target section at visual index
-    const sectionMidpointOffset = visualIndex * sectionAngle + (sectionAngle / 2);
-    const targetRotationOffset = pointerAngle - sectionMidpointOffset;
+    // For visual index i, the section's middle is at: i * sectionAngle + sectionAngle/2
+    // We want this to align with the pointer position after rotation
+    // So: (i * sectionAngle + sectionAngle/2) + finalRotation = pointerAngle + n*2π
+    // Therefore: finalRotation = pointerAngle - (i * sectionAngle + sectionAngle/2) + n*2π
+    const sectionMidpoint = visualIndex * sectionAngle + (sectionAngle / 2);
+    let targetRotation = pointerAngle - sectionMidpoint;
     
-    console.log('Section angle:', sectionAngle * (180 / Math.PI), 'degrees');
-    console.log('Section midpoint offset:', sectionMidpointOffset * (180 / Math.PI), 'degrees');
-    console.log('Target rotation offset:', targetRotationOffset * (180 / Math.PI), 'degrees');
+    // Add rotations to make it positive and add visual effect (minimum 5 rotations)
+    const baseRotations = Math.floor(Math.random() * 3) + 5; // 5-7 full rotations
+    targetRotation += baseRotations * 2 * Math.PI;
     
-    // Normalize to ensure we rotate in the positive direction
-    let normalizedOffset = targetRotationOffset;
-    while (normalizedOffset <= 0) {
-      normalizedOffset += 2 * Math.PI;
+    // Ensure we're always rotating forward from current position
+    while (targetRotation <= currentRotation) {
+      targetRotation += 2 * Math.PI;
     }
     
-    // Add multiple rotations for visual effect (at least 5 full rotations as requested)
-    const baseRotations = Math.random() * 3 + 5; // 5-8 rotations
-    const finalRotation = currentRotation + (baseRotations * 2 * Math.PI) + normalizedOffset;
-    
-    console.log('Final rotation:', finalRotation);
+    console.log('Section angle:', sectionAngle * (180 / Math.PI), 'degrees');
+    console.log('Section midpoint:', sectionMidpoint * (180 / Math.PI), 'degrees');
+    console.log('Target rotation:', targetRotation * (180 / Math.PI), 'degrees');
+    console.log('Current rotation:', currentRotation * (180 / Math.PI), 'degrees');
     console.log('==================');
-    return finalRotation;
+    
+    return targetRotation;
   };
 
   // Calculate which section is currently under the pointer
