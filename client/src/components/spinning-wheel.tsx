@@ -137,8 +137,13 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
     if (!activeCampaign) return null;
     
     try {
-      const response = await apiRequest("GET", `/api/campaigns/${activeCampaign.id}/next-winner`);
-      return response as unknown as WheelSection | null;
+      const response = await fetch(`/api/campaigns/${activeCampaign.id}/next-winner`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const winner = await response.json();
+      console.log("Parsed winner from API:", winner);
+      return winner;
     } catch (error) {
       console.error("Failed to get next winner:", error);
       // Fallback to random selection if sequence fails
@@ -154,7 +159,12 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
     if (!activeCampaign) return;
     
     try {
-      await apiRequest("POST", `/api/campaigns/${activeCampaign.id}/advance-sequence`);
+      const response = await fetch(`/api/campaigns/${activeCampaign.id}/advance-sequence`, {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
     } catch (error) {
       console.error("Failed to advance sequence:", error);
     }
