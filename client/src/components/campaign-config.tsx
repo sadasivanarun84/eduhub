@@ -89,18 +89,33 @@ export function CampaignConfig({ onCampaignUpdate }: CampaignConfigProps) {
   const resetCampaignMutation = useMutation({
     mutationFn: async () => {
       if (!activeCampaign) throw new Error("No active campaign");
-      return apiRequest("POST", `/api/campaigns/${activeCampaign.id}/reset`);
+      const response = await fetch(`/api/campaigns/${activeCampaign.id}/reset`, {
+        method: 'POST',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/spin-results"] });
+      // Force invalidate all related queries without cache
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns"], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ["/api/spin-results"], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ["/api/wheel-sections"], refetchType: 'all' });
+      // Force refetch immediately
+      queryClient.refetchQueries({ queryKey: ["/api/campaigns/active"] });
+      queryClient.refetchQueries({ queryKey: ["/api/spin-results"] });
       onCampaignUpdate?.();
       toast({
         title: "Campaign reset",
         description: "Campaign has been reset. All spin results cleared and rotation sequence regenerated.",
       });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error('Reset error:', error);
       toast({
         title: "Error",
         description: "Failed to reset campaign. Please try again.",

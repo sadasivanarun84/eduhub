@@ -70,9 +70,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/campaigns/:id/reset", async (req, res) => {
     try {
       const resetCampaign = await storage.resetCampaign(req.params.id);
+      // Prevent caching of reset responses
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
       res.json(resetCampaign);
     } catch (error) {
-      res.status(500).json({ message: "Failed to reset campaign" });
+      console.error('Reset campaign error:', error);
+      res.status(500).json({ message: "Failed to reset campaign", error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -137,6 +142,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const campaignId = req.query.campaignId as string | undefined;
       const results = await storage.getSpinResults(campaignId);
+      // Prevent caching to ensure fresh data
+      res.set('Cache-Control', 'no-cache');
       res.json(results);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch spin results" });
