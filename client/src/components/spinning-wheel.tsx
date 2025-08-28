@@ -175,29 +175,69 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
     const sectionIndex = sections.findIndex(s => s.id === targetSection.id);
     if (sectionIndex === -1) {
       console.error('Target section not found in sections array:', targetSection);
-      return currentRotation; // Return current rotation if section not found
+      return currentRotation;
     }
 
     console.log('Target section:', targetSection.text, 'Index:', sectionIndex, 'Total sections:', sections.length);
 
     const sectionAngle = (2 * Math.PI) / sections.length;
-    const pointerAngle = -Math.PI / 2; // Pointer points up
+    const pointerAngle = -Math.PI / 2; // Pointer points up (top of circle)
     
-    // The wheel draws sections starting from index 0, so the visual angle for section at index i is:
-    // startAngle = i * sectionAngle, midpoint = startAngle + sectionAngle/2
-    const sectionMidpoint = sectionIndex * sectionAngle + (sectionAngle / 2);
+    // When wheel rotates by currentRotation, section i is at: (i * sectionAngle) + currentRotation
+    // The midpoint of section i is at: (i * sectionAngle) + currentRotation + (sectionAngle/2)
+    // For pointer to point at this section: (i * sectionAngle) + finalRotation + (sectionAngle/2) = pointerAngle
+    // Therefore: finalRotation = pointerAngle - (i * sectionAngle) - (sectionAngle/2)
     
-    // We want the pointer to point to this section's midpoint
-    // So we need: finalRotation + sectionMidpoint = pointerAngle (mod 2π)
-    // Therefore: finalRotation = pointerAngle - sectionMidpoint
-    const targetRotation = pointerAngle - sectionMidpoint;
+    const sectionMidpointOffset = sectionIndex * sectionAngle + (sectionAngle / 2);
+    const targetRotationOffset = pointerAngle - sectionMidpointOffset;
+    
+    // Normalize to ensure we rotate in the positive direction
+    let normalizedOffset = targetRotationOffset;
+    while (normalizedOffset <= 0) {
+      normalizedOffset += 2 * Math.PI;
+    }
     
     // Add multiple rotations for visual effect (3-8 full rotations)
     const baseRotations = Math.random() * 5 + 3;
-    const finalRotation = currentRotation + (baseRotations * 2 * Math.PI) + targetRotation;
+    const finalRotation = currentRotation + (baseRotations * 2 * Math.PI) + normalizedOffset;
     
-    console.log('Calculated rotation for section', targetSection.text, ':', finalRotation);
+    console.log('Section midpoint offset:', sectionMidpointOffset);
+    console.log('Target rotation offset:', targetRotationOffset);
+    console.log('Normalized offset:', normalizedOffset);
+    console.log('Final rotation for section', targetSection.text, ':', finalRotation);
     return finalRotation;
+  };
+
+  // Calculate which section is currently under the pointer
+  const getWinnerAtCurrentPosition = (): WheelSection | null => {
+    if (sections.length === 0) return null;
+    
+    const sectionAngle = (2 * Math.PI) / sections.length;
+    const pointerAngle = -Math.PI / 2; // Pointer points up
+    
+    // Normalize the current rotation
+    const normalizedRotation = currentRotation % (2 * Math.PI);
+    
+    // Calculate which section the pointer is currently pointing at
+    // Pointer angle relative to wheel position
+    let relativeAngle = pointerAngle - normalizedRotation;
+    
+    // Normalize to 0-2π range
+    while (relativeAngle < 0) {
+      relativeAngle += 2 * Math.PI;
+    }
+    while (relativeAngle >= 2 * Math.PI) {
+      relativeAngle -= 2 * Math.PI;
+    }
+    
+    // Find which section this angle falls into
+    const sectionIndex = Math.floor(relativeAngle / sectionAngle);
+    
+    console.log('Current rotation:', normalizedRotation);
+    console.log('Relative angle:', relativeAngle);
+    console.log('Section index under pointer:', sectionIndex);
+    
+    return sections[sectionIndex] || null;
   };
 
   // Random selection from a specific set of sections
@@ -248,8 +288,13 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
         setCurrentRotation(finalRot);
         console.log('Wheel stopped at rotation:', finalRot, 'Winner should be:', selectedWinner.text);
 
-        // Winner was determined from sequence before spinning
+        // Verify the actual winner matches the visual result
+        const actualWinner = getWinnerAtCurrentPosition();
+        console.log('Expected winner:', selectedWinner.text);
+        console.log('Visual winner at pointer:', actualWinner?.text);
+        
         setTimeout(async () => {
+          // Use the winner from sequence (predetermined)
           onSpinComplete(selectedWinner.text);
           recordSpinMutation.mutate({ 
             winner: selectedWinner.text, 
