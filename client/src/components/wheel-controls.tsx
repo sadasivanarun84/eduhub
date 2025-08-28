@@ -150,8 +150,9 @@ export function WheelControls({ sections, isLoading, onSectionsUpdate }: WheelCo
     addSectionMutation.mutate({
       text: newSectionText.trim(),
       color: randomColor,
-      amount,
+      amount: amount,
       order,
+      maxWins: null,
     });
   };
 
@@ -215,35 +216,36 @@ export function WheelControls({ sections, isLoading, onSectionsUpdate }: WheelCo
                     style={{ backgroundColor: section.color }}
                   />
                   <span className="flex-1">{section.text}</span>
-                  {section.amount && (
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2">
+                    {section.amount && (
                       <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full">
                         ${section.amount.toLocaleString()}
                       </span>
-                      <div className="flex items-center gap-1 text-xs">
-                        <span className="text-muted-foreground">Quota:</span>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={section.maxWins || 0}
-                          onChange={(e) => {
-                            const newMaxWins = parseInt(e.target.value) || 0;
-                            updateSectionMutation.mutate({
-                              id: section.id,
-                              maxWins: newMaxWins,
-                            });
-                          }}
-                          className="w-16 h-6 text-xs"
-                          data-testid={`input-quota-${section.id}`}
-                        />
-                        {section.maxWins && section.maxWins > 0 && (
-                          <span className="text-xs text-muted-foreground">
-                            ({section.currentWins || 0}/{section.maxWins})
-                          </span>
-                        )}
-                      </div>
+                    )}
+                    <div className="flex items-center gap-1 text-xs">
+                      <span className="text-muted-foreground">Frequency:</span>
+                      <Input
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        value={section.maxWins || 0}
+                        onChange={(e) => {
+                          const newMaxWins = parseInt(e.target.value) || 0;
+                          updateSectionMutation.mutate({
+                            id: section.id,
+                            maxWins: newMaxWins,
+                          });
+                        }}
+                        className="w-16 h-6 text-xs"
+                        data-testid={`input-frequency-${section.id}`}
+                      />
+                      {section.maxWins && section.maxWins > 0 && (
+                        <span className="text-xs text-muted-foreground">
+                          ({section.currentWins || 0}/{section.maxWins})
+                        </span>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
                 <Button
                   variant="ghost"

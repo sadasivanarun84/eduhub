@@ -50,7 +50,6 @@ export class MemStorage implements IStorage {
       name: "Default Campaign",
       totalAmount: null,
       totalWinners: 100,
-      threshold: null,
       currentSpent: 0,
       currentWinners: 0,
       isActive: true,
@@ -58,26 +57,7 @@ export class MemStorage implements IStorage {
     };
     this.campaigns.set(campaignId, defaultCampaign);
 
-    // Create default wheel sections
-    const defaultSections = [
-      { text: 'Prize A', color: '#ef4444', amount: null, order: 0 },
-      { text: 'Prize B', color: '#3b82f6', amount: null, order: 1 },
-      { text: 'Prize C', color: '#22c55e', amount: null, order: 2 },
-      { text: 'Prize D', color: '#eab308', amount: null, order: 3 },
-      { text: 'Prize E', color: '#8b5cf6', amount: null, order: 4 },
-      { text: 'Prize F', color: '#ec4899', amount: null, order: 5 },
-    ];
-
-    defaultSections.forEach(section => {
-      const id = randomUUID();
-      const wheelSection: WheelSection = {
-        ...section,
-        id,
-        campaignId,
-        createdAt: new Date(),
-      };
-      this.wheelSections.set(id, wheelSection);
-    });
+    // Start with empty wheel - no default sections
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -115,8 +95,10 @@ export class MemStorage implements IStorage {
   async createCampaign(insertCampaign: InsertCampaign): Promise<Campaign> {
     const id = randomUUID();
     const campaign: Campaign = {
-      ...insertCampaign,
       id,
+      name: insertCampaign.name,
+      totalAmount: insertCampaign.totalAmount ?? null,
+      totalWinners: insertCampaign.totalWinners,
       currentSpent: 0,
       currentWinners: 0,
       isActive: true,
@@ -170,8 +152,14 @@ export class MemStorage implements IStorage {
   async createWheelSection(insertSection: InsertWheelSection): Promise<WheelSection> {
     const id = randomUUID();
     const section: WheelSection = {
-      ...insertSection,
       id,
+      campaignId: insertSection.campaignId || null,
+      text: insertSection.text,
+      color: insertSection.color,
+      amount: insertSection.amount || null,
+      maxWins: insertSection.maxWins || null,
+      currentWins: 0,
+      order: insertSection.order,
       createdAt: new Date(),
     };
     this.wheelSections.set(id, section);
@@ -225,8 +213,10 @@ export class MemStorage implements IStorage {
   async createSpinResult(insertResult: InsertSpinResult): Promise<SpinResult> {
     const id = randomUUID();
     const result: SpinResult = {
-      ...insertResult,
       id,
+      campaignId: insertResult.campaignId || null,
+      amount: insertResult.amount || null,
+      winner: insertResult.winner,
       timestamp: new Date(),
     };
     this.spinResults.set(id, result);
