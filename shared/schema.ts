@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, json } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -10,6 +10,8 @@ export const campaigns = pgTable("campaigns", {
   totalWinners: integer("total_winners").notNull(),
   currentSpent: integer("current_spent").default(0),
   currentWinners: integer("current_winners").default(0),
+  rotationSequence: json("rotation_sequence").$type<string[]>().default([]), // Array of section IDs in rotation order
+  currentSequenceIndex: integer("current_sequence_index").default(0), // Current position in rotation sequence
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });

@@ -24,6 +24,10 @@ export interface IStorage {
   getSpinResults(campaignId?: string): Promise<SpinResult[]>;
   createSpinResult(result: InsertSpinResult): Promise<SpinResult>;
   clearSpinResults(campaignId?: string): Promise<void>;
+  
+  // Rotation sequence
+  getNextWinnerFromSequence(campaignId: string): Promise<WheelSection | null>;
+  advanceSequenceIndex(campaignId: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -52,12 +56,85 @@ export class MemStorage implements IStorage {
       totalWinners: 100,
       currentSpent: 0,
       currentWinners: 0,
+      rotationSequence: [],
+      currentSequenceIndex: 0,
       isActive: true,
       createdAt: new Date(),
     };
     this.campaigns.set(campaignId, defaultCampaign);
 
     // Start with empty wheel - no default sections
+  }
+
+  // Generate rotation sequence based on wheel sections and their quotas
+  private generateRotationSequence(wheelSections: WheelSection[]): string[] {
+    const sequence: string[] = [];
+    
+    // Filter sections that have quotas set
+    const sectionsWithQuotas = wheelSections.filter(section => 
+      section.maxWins && section.maxWins > 0
+    );
+    
+    if (sectionsWithQuotas.length === 0) {
+      // No quotas configured, return empty sequence
+      return [];
+    }
+    
+    // Create array with section IDs repeated according to their quotas
+    const sectionPool: string[] = [];
+    sectionsWithQuotas.forEach(section => {
+      const quota = section.maxWins || 0;
+      for (let i = 0; i < quota; i++) {
+        sectionPool.push(section.id);
+      }
+    });
+    
+    // Shuffle the pool to create a random but quota-compliant sequence
+    const shuffled = [...sectionPool];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    
+    return shuffled;
+  }
+
+  // Get the next winner from the rotation sequence
+  async getNextWinnerFromSequence(campaignId: string): Promise<WheelSection | null> {
+    const campaign = this.campaigns.get(campaignId);
+    if (!campaign || !campaign.rotationSequence || campaign.rotationSequence.length === 0) {
+      return null;
+    }
+
+    // Check if we've reached the end of the sequence
+    const currentIndex = campaign.currentSequenceIndex || 0;
+    if (currentIndex >= campaign.rotationSequence.length) {
+      return null; // All prizes have been distributed
+    }
+
+    const nextSectionId = campaign.rotationSequence[currentIndex];
+    const nextSection = this.wheelSections.get(nextSectionId);
+
+    if (!nextSection) {
+      // Section was deleted, advance the sequence index
+      await this.advanceSequenceIndex(campaignId);
+      return this.getNextWinnerFromSequence(campaignId);
+    }
+
+    return nextSection;
+  }
+
+  // Advance the sequence index after a spin
+  async advanceSequenceIndex(campaignId: string): Promise<void> {
+    const campaign = this.campaigns.get(campaignId);
+    if (campaign) {
+      const currentIndex = campaign.currentSequenceIndex || 0;
+      const updated = {
+        ...campaign,
+        currentSequenceIndex: currentIndex + 1
+      };
+      this.campaigns.set(campaignId, updated);
+    }
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -101,6 +178,8 @@ export class MemStorage implements IStorage {
       totalWinners: insertCampaign.totalWinners,
       currentSpent: 0,
       currentWinners: 0,
+      rotationSequence: [],
+      currentSequenceIndex: 0,
       isActive: true,
       createdAt: new Date(),
     };
@@ -114,6 +193,14 @@ export class MemStorage implements IStorage {
       throw new Error(`Campaign with id ${id} not found`);
     }
     const updated = { ...existing, ...updates };
+    
+    // Regenerate rotation sequence if wheel sections changed
+    if (updates.totalWinners !== undefined) {
+      const wheelSections = await this.getWheelSections(id);
+      updated.rotationSequence = this.generateRotationSequence(wheelSections);
+      updated.currentSequenceIndex = 0;
+    }
+    
     this.campaigns.set(id, updated);
     return updated;
   }
@@ -163,6 +250,22 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
     };
     this.wheelSections.set(id, section);
+    
+    // Regenerate rotation sequence for the campaign when new sections are added
+    if (section.campaignId) {
+      const campaign = this.campaigns.get(section.campaignId);
+      if (campaign) {
+        const allSections = await this.getWheelSections(section.campaignId);
+        const newSequence = this.generateRotationSequence(allSections);
+        const updatedCampaign = {
+          ...campaign,
+          rotationSequence: newSequence,
+          currentSequenceIndex: 0
+        };
+        this.campaigns.set(section.campaignId, updatedCampaign);
+      }
+    }
+    
     return section;
   }
 
@@ -173,6 +276,22 @@ export class MemStorage implements IStorage {
     }
     const updated = { ...existing, ...updates };
     this.wheelSections.set(id, updated);
+    
+    // Regenerate rotation sequence for the campaign when wheel sections change
+    if (updated.campaignId && (updates.maxWins !== undefined || updates.amount !== undefined)) {
+      const campaign = this.campaigns.get(updated.campaignId);
+      if (campaign) {
+        const allSections = await this.getWheelSections(updated.campaignId);
+        const newSequence = this.generateRotationSequence(allSections);
+        const updatedCampaign = {
+          ...campaign,
+          rotationSequence: newSequence,
+          currentSequenceIndex: 0
+        };
+        this.campaigns.set(updated.campaignId, updatedCampaign);
+      }
+    }
+    
     return updated;
   }
 

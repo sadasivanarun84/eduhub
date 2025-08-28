@@ -161,6 +161,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Rotation sequence routes
+  app.get("/api/campaigns/:id/next-winner", async (req, res) => {
+    try {
+      const nextWinner = await storage.getNextWinnerFromSequence(req.params.id);
+      res.json(nextWinner);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get next winner" });
+    }
+  });
+
+  app.post("/api/campaigns/:id/advance-sequence", async (req, res) => {
+    try {
+      await storage.advanceSequenceIndex(req.params.id);
+      res.json({ message: "Sequence advanced successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to advance sequence" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

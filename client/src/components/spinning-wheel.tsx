@@ -132,64 +132,32 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
     ctx.stroke();
   };
 
-  // Intelligent winner selection based on quota system - called BEFORE spinning
-  const selectWinnerWithQuota = (): WheelSection | null => {
-    if (sections.length === 0) return null;
-
-    // Check if we have campaign with quota constraints
-    const hasQuotaConstraints = activeCampaign && 
-      sections.some(section => section.maxWins && section.maxWins > 0);
-
-    if (!hasQuotaConstraints) {
-      // No quota constraints - select randomly from all sections
-      return sections[Math.floor(Math.random() * sections.length)];
-    }
-
-    // Quota-based selection logic
-    const campaign = activeCampaign!;
-    const remainingWinners = campaign.totalWinners - (campaign.currentWinners || 0);
-
-    if (remainingWinners <= 0) {
-      // No more winners allowed in campaign
-      return null;
-    }
-
-    // Find sections that still have quota remaining
-    const availableSections = sections.filter(section => {
-      if (!section.maxWins || section.maxWins === 0) {
-        // Sections without quota (like "Better Luck Next Time") are always available
-        return true;
-      }
-      // Sections with quota are available if they haven't reached their limit
-      return (section.currentWins || 0) < section.maxWins;
-    });
-
-    if (availableSections.length === 0) {
-      // No sections available - all quotas exhausted
-      return null;
-    }
-
-    // Prioritize sections with amounts (prizes) if available
-    const prizeSections = availableSections.filter(section => 
-      section.amount && section.amount > 0 && section.maxWins && section.maxWins > 0
-    );
+  // Get next winner from rotation sequence
+  const getNextWinnerFromSequence = async (): Promise<WheelSection | null> => {
+    if (!activeCampaign) return null;
     
-    const nonPrizeSections = availableSections.filter(section => 
-      !section.amount || section.amount === 0 || !section.maxWins || section.maxWins === 0
-    );
-
-    // If we have prize sections with quota remaining, select from them
-    if (prizeSections.length > 0) {
-      return getRandomWinnerFromSections(prizeSections);
+    try {
+      const response = await apiRequest("GET", `/api/campaigns/${activeCampaign.id}/next-winner`);
+      return response as unknown as WheelSection | null;
+    } catch (error) {
+      console.error("Failed to get next winner:", error);
+      // Fallback to random selection if sequence fails
+      if (sections.length > 0) {
+        return sections[Math.floor(Math.random() * sections.length)];
+      }
+      return null;
     }
+  };
 
-    // Otherwise, select from non-prize sections (like "Better Luck Next Time")
-    if (nonPrizeSections.length > 0) {
-      return getRandomWinnerFromSections(nonPrizeSections);
+  // Advance sequence after successful spin
+  const advanceSequence = async (): Promise<void> => {
+    if (!activeCampaign) return;
+    
+    try {
+      await apiRequest("POST", `/api/campaigns/${activeCampaign.id}/advance-sequence`);
+    } catch (error) {
+      console.error("Failed to advance sequence:", error);
     }
-
-    // Fallback to any available section
-    return getRandomWinnerFromSections(availableSections);
   };
 
   // Calculate the rotation needed to land on a specific section
@@ -217,13 +185,13 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
   };
 
 
-  const spinWheel = () => {
+  const spinWheel = async () => {
     if (isSpinning || sections.length === 0) return;
 
     setIsSpinning(true);
 
-    // First, select the winner using quota logic
-    const selectedWinner = selectWinnerWithQuota();
+    // Get the next winner from the rotation sequence
+    const selectedWinner = await getNextWinnerFromSequence();
     
     if (!selectedWinner) {
       setIsSpinning(false);
@@ -253,13 +221,15 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
         const finalRot = finalRotation % (2 * Math.PI);
         setCurrentRotation(finalRot);
 
-        // Winner was already determined before spinning
-        setTimeout(() => {
+        // Winner was determined from sequence before spinning
+        setTimeout(async () => {
           onSpinComplete(selectedWinner.text);
           recordSpinMutation.mutate({ 
             winner: selectedWinner.text, 
             amount: selectedWinner.amount || undefined 
           });
+          // Advance the sequence index
+          await advanceSequence();
           setIsSpinning(false);
         }, 500);
       }
