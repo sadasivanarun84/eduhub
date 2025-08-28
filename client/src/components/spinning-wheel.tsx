@@ -142,7 +142,6 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const winner = await response.json();
-      console.log("Parsed winner from API:", winner);
       return winner;
     } catch (error) {
       console.error("Failed to get next winner:", error);
@@ -178,8 +177,6 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
       return currentRotation;
     }
 
-    console.log('Target section:', targetSection.text, 'Index:', sectionIndex, 'Total sections:', sections.length);
-
     const sectionAngle = (2 * Math.PI) / sections.length;
     const pointerAngle = -Math.PI / 2; // Pointer points up (top of circle)
     
@@ -201,10 +198,6 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
     const baseRotations = Math.random() * 5 + 3;
     const finalRotation = currentRotation + (baseRotations * 2 * Math.PI) + normalizedOffset;
     
-    console.log('Section midpoint offset:', sectionMidpointOffset);
-    console.log('Target rotation offset:', targetRotationOffset);
-    console.log('Normalized offset:', normalizedOffset);
-    console.log('Final rotation for section', targetSection.text, ':', finalRotation);
     return finalRotation;
   };
 
@@ -233,10 +226,6 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
     // Find which section this angle falls into
     const sectionIndex = Math.floor(relativeAngle / sectionAngle);
     
-    console.log('Current rotation:', normalizedRotation);
-    console.log('Relative angle:', relativeAngle);
-    console.log('Section index under pointer:', sectionIndex);
-    
     return sections[sectionIndex] || null;
   };
 
@@ -251,18 +240,14 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
     if (isSpinning || sections.length === 0) return;
 
     setIsSpinning(true);
-    console.log('Starting spin with sections:', sections.map(s => ({id: s.id, text: s.text, order: s.order})));
 
     // Get the next winner from the rotation sequence
     const selectedWinner = await getNextWinnerFromSequence();
     
     if (!selectedWinner) {
-      console.log('No winner selected from sequence');
       setIsSpinning(false);
       return;
     }
-
-    console.log('Selected winner from sequence:', selectedWinner.text, 'ID:', selectedWinner.id);
 
     const duration = spinDuration[0] * 1000; // Convert to milliseconds
     // Calculate the exact rotation needed to land on the selected winner
@@ -286,12 +271,6 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
         // Spinning finished
         const finalRot = finalRotation % (2 * Math.PI);
         setCurrentRotation(finalRot);
-        console.log('Wheel stopped at rotation:', finalRot, 'Winner should be:', selectedWinner.text);
-
-        // Verify the actual winner matches the visual result
-        const actualWinner = getWinnerAtCurrentPosition();
-        console.log('Expected winner:', selectedWinner.text);
-        console.log('Visual winner at pointer:', actualWinner?.text);
         
         setTimeout(async () => {
           // Use the winner from sequence (predetermined)

@@ -28,6 +28,9 @@ export interface IStorage {
   // Rotation sequence
   getNextWinnerFromSequence(campaignId: string): Promise<WheelSection | null>;
   advanceSequenceIndex(campaignId: string): Promise<void>;
+  
+  // Campaign reset
+  resetCampaign(campaignId: string): Promise<Campaign>;
 }
 
 export class MemStorage implements IStorage {
@@ -218,6 +221,32 @@ export class MemStorage implements IStorage {
         this.spinResults.delete(resultId);
       }
     });
+  }
+
+  async resetCampaign(campaignId: string): Promise<Campaign> {
+    const campaign = this.campaigns.get(campaignId);
+    if (!campaign) {
+      throw new Error('Campaign not found');
+    }
+
+    // Clear all spin results for this campaign
+    await this.clearSpinResults(campaignId);
+
+    // Get current wheel sections to regenerate sequence
+    const wheelSections = await this.getWheelSections(campaignId);
+    const newSequence = this.generateRotationSequence(wheelSections);
+
+    // Reset campaign progress
+    const resetCampaign: Campaign = {
+      ...campaign,
+      currentSpent: 0,
+      currentWinners: 0,
+      rotationSequence: newSequence,
+      currentSequenceIndex: 0,
+    };
+
+    this.campaigns.set(campaignId, resetCampaign);
+    return resetCampaign;
   }
 
   async getWheelSections(campaignId?: string): Promise<WheelSection[]> {

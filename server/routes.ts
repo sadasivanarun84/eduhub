@@ -67,6 +67,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/campaigns/:id/reset", async (req, res) => {
+    try {
+      const resetCampaign = await storage.resetCampaign(req.params.id);
+      res.json(resetCampaign);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to reset campaign" });
+    }
+  });
+
   // Wheel sections routes
   app.get("/api/wheel-sections", async (req, res) => {
     try {

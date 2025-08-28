@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Settings, Trophy, Target } from "lucide-react";
+import { Settings, Trophy, Target, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Campaign, InsertCampaign } from "@shared/schema";
 
@@ -81,6 +81,29 @@ export function CampaignConfig({ onCampaignUpdate }: CampaignConfigProps) {
       toast({
         title: "Error",
         description: "Failed to update campaign. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resetCampaignMutation = useMutation({
+    mutationFn: async () => {
+      if (!activeCampaign) throw new Error("No active campaign");
+      return apiRequest("POST", `/api/campaigns/${activeCampaign.id}/reset`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/spin-results"] });
+      onCampaignUpdate?.();
+      toast({
+        title: "Campaign reset",
+        description: "Campaign has been reset. All spin results cleared and rotation sequence regenerated.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to reset campaign. Please try again.",
         variant: "destructive",
       });
     },
@@ -263,15 +286,31 @@ export function CampaignConfig({ onCampaignUpdate }: CampaignConfigProps) {
               </>
             )}
 
-            {/* Submit Button */}
-            <Button
-              type="submit"
-              className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-              disabled={createCampaignMutation.isPending || updateCampaignMutation.isPending}
-              data-testid="button-save-campaign"
-            >
-              {activeCampaign ? "Update Campaign" : "Create Campaign"}
-            </Button>
+            {/* Action Buttons */}
+            <div className="space-y-3">
+              <Button
+                type="submit"
+                className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                disabled={createCampaignMutation.isPending || updateCampaignMutation.isPending}
+                data-testid="button-save-campaign"
+              >
+                {activeCampaign ? "Update Campaign" : "Create Campaign"}
+              </Button>
+              
+              {activeCampaign && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full border-orange-500 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950"
+                  disabled={resetCampaignMutation.isPending}
+                  onClick={() => resetCampaignMutation.mutate()}
+                  data-testid="button-reset-campaign"
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  {resetCampaignMutation.isPending ? "Resetting..." : "Reset Campaign"}
+                </Button>
+              )}
+            </div>
           </form>
         )}
       </CardContent>
