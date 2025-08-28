@@ -163,19 +163,31 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
   // Calculate the rotation needed to land on a specific section
   const getTargetRotationForSection = (targetSection: WheelSection): number => {
     const sectionIndex = sections.findIndex(s => s.id === targetSection.id);
-    if (sectionIndex === -1) return 0;
+    if (sectionIndex === -1) {
+      console.error('Target section not found in sections array:', targetSection);
+      return currentRotation; // Return current rotation if section not found
+    }
+
+    console.log('Target section:', targetSection.text, 'Index:', sectionIndex, 'Total sections:', sections.length);
 
     const sectionAngle = (2 * Math.PI) / sections.length;
     const pointerAngle = -Math.PI / 2; // Pointer points up
     
-    // Calculate the angle where this section should be when pointer points to it
-    const targetAngle = sectionIndex * sectionAngle + (sectionAngle / 2);
+    // The wheel draws sections starting from index 0, so the visual angle for section at index i is:
+    // startAngle = i * sectionAngle, midpoint = startAngle + sectionAngle/2
+    const sectionMidpoint = sectionIndex * sectionAngle + (sectionAngle / 2);
+    
+    // We want the pointer to point to this section's midpoint
+    // So we need: finalRotation + sectionMidpoint = pointerAngle (mod 2π)
+    // Therefore: finalRotation = pointerAngle - sectionMidpoint
+    const targetRotation = pointerAngle - sectionMidpoint;
     
     // Add multiple rotations for visual effect (3-8 full rotations)
     const baseRotations = Math.random() * 5 + 3;
-    const totalRotation = (baseRotations * 2 * Math.PI) + (pointerAngle - targetAngle);
+    const finalRotation = currentRotation + (baseRotations * 2 * Math.PI) + targetRotation;
     
-    return currentRotation + totalRotation;
+    console.log('Calculated rotation for section', targetSection.text, ':', finalRotation);
+    return finalRotation;
   };
 
   // Random selection from a specific set of sections
@@ -189,14 +201,18 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
     if (isSpinning || sections.length === 0) return;
 
     setIsSpinning(true);
+    console.log('Starting spin with sections:', sections.map(s => ({id: s.id, text: s.text, order: s.order})));
 
     // Get the next winner from the rotation sequence
     const selectedWinner = await getNextWinnerFromSequence();
     
     if (!selectedWinner) {
+      console.log('No winner selected from sequence');
       setIsSpinning(false);
       return;
     }
+
+    console.log('Selected winner from sequence:', selectedWinner.text, 'ID:', selectedWinner.id);
 
     const duration = spinDuration[0] * 1000; // Convert to milliseconds
     // Calculate the exact rotation needed to land on the selected winner
@@ -220,6 +236,7 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
         // Spinning finished
         const finalRot = finalRotation % (2 * Math.PI);
         setCurrentRotation(finalRot);
+        console.log('Wheel stopped at rotation:', finalRot, 'Winner should be:', selectedWinner.text);
 
         // Winner was determined from sequence before spinning
         setTimeout(async () => {
