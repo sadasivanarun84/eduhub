@@ -8,7 +8,6 @@ export const campaigns = pgTable("campaigns", {
   name: text("name").notNull(),
   totalAmount: integer("total_amount"),
   totalWinners: integer("total_winners").notNull(),
-  threshold: integer("threshold"),
   currentSpent: integer("current_spent").default(0),
   currentWinners: integer("current_winners").default(0),
   isActive: boolean("is_active").default(true),
@@ -21,6 +20,8 @@ export const wheelSections = pgTable("wheel_sections", {
   text: text("text").notNull(),
   color: text("color").notNull(),
   amount: integer("amount"), // Prize amount if applicable
+  maxWins: integer("max_wins").default(0), // Maximum times this prize can be won
+  currentWins: integer("current_wins").default(0), // Current times this prize has been won
   order: integer("order").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -37,7 +38,6 @@ export const insertCampaignSchema = createInsertSchema(campaigns).pick({
   name: true,
   totalAmount: true,
   totalWinners: true,
-  threshold: true,
 });
 
 export const insertWheelSectionSchema = createInsertSchema(wheelSections).pick({
@@ -45,6 +45,7 @@ export const insertWheelSectionSchema = createInsertSchema(wheelSections).pick({
   text: true,
   color: true,
   amount: true,
+  maxWins: true,
   order: true,
 });
 

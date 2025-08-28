@@ -178,6 +178,16 @@ export class MemStorage implements IStorage {
     return section;
   }
 
+  async updateWheelSection(id: string, updates: Partial<WheelSection>): Promise<WheelSection> {
+    const existing = this.wheelSections.get(id);
+    if (!existing) {
+      throw new Error(`Wheel section with id ${id} not found`);
+    }
+    const updated = { ...existing, ...updates };
+    this.wheelSections.set(id, updated);
+    return updated;
+  }
+
   async deleteWheelSection(id: string): Promise<void> {
     this.wheelSections.delete(id);
   }
@@ -227,10 +237,26 @@ export class MemStorage implements IStorage {
       if (campaign) {
         const updatedCampaign = {
           ...campaign,
-          currentWinners: campaign.currentWinners + 1,
-          currentSpent: campaign.currentSpent + (insertResult.amount || 0),
+          currentWinners: (campaign.currentWinners || 0) + 1,
+          currentSpent: (campaign.currentSpent || 0) + (insertResult.amount || 0),
         };
         this.campaigns.set(insertResult.campaignId, updatedCampaign);
+      }
+
+      // Update wheel section current wins count
+      const wheelSections = Array.from(this.wheelSections.values());
+      const matchingSection = wheelSections.find(section => 
+        section.campaignId === insertResult.campaignId &&
+        section.text === insertResult.winner &&
+        section.amount === insertResult.amount
+      );
+
+      if (matchingSection) {
+        const updatedSection = {
+          ...matchingSection,
+          currentWins: (matchingSection.currentWins || 0) + 1,
+        };
+        this.wheelSections.set(matchingSection.id, updatedSection);
       }
     }
     
@@ -254,6 +280,16 @@ export class MemStorage implements IStorage {
         };
         this.campaigns.set(campaignId, updatedCampaign);
       }
+      // Reset wheel section current wins
+      Array.from(this.wheelSections.entries()).forEach(([sectionId, section]) => {
+        if (section.campaignId === campaignId) {
+          const updatedSection = {
+            ...section,
+            currentWins: 0,
+          };
+          this.wheelSections.set(sectionId, updatedSection);
+        }
+      });
     } else {
       this.spinResults.clear();
     }

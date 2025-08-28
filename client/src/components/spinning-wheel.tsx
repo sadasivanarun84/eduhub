@@ -132,56 +132,64 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
     ctx.stroke();
   };
 
-  // Intelligent winner selection based on campaign threshold logic
+  // Intelligent winner selection based on quota system
   const determineWinner = (finalRotation: number): WheelSection | null => {
     if (sections.length === 0) return null;
 
-    // Check if we have campaign constraints
-    const hasCampaignConstraints = activeCampaign && 
-      activeCampaign.totalAmount && 
-      activeCampaign.threshold &&
-      sections.some(section => section.amount !== null);
+    // Check if we have campaign with quota constraints
+    const hasQuotaConstraints = activeCampaign && 
+      sections.some(section => section.maxWins && section.maxWins > 0);
 
-    if (!hasCampaignConstraints) {
-      // No campaign constraints - use traditional random selection
+    if (!hasQuotaConstraints) {
+      // No quota constraints - use traditional random selection
       return getRandomWinner(finalRotation);
     }
 
-    // Campaign with threshold logic
+    // Quota-based selection logic
     const campaign = activeCampaign!;
-    const sectionsWithAmounts = sections.filter(section => section.amount !== null);
-    const thresholdReached = campaign.currentSpent >= campaign.threshold!;
-
-    if (!thresholdReached) {
-      // Threshold not reached - random selection from all sections
-      return getRandomWinner(finalRotation);
-    }
-
-    // Threshold reached - controlled selection based on remaining budget
-    const remainingBudget = campaign.totalAmount! - campaign.currentSpent;
-    const remainingWinners = campaign.totalWinners - campaign.currentWinners;
+    const remainingWinners = campaign.totalWinners - (campaign.currentWinners || 0);
 
     if (remainingWinners <= 0) {
-      // No more winners allowed
+      // No more winners allowed in campaign
       return null;
     }
 
-    // Find affordable prizes that fit within remaining budget
-    const affordablePrizes = sectionsWithAmounts.filter(section => 
-      (section.amount || 0) <= remainingBudget
+    // Find sections that still have quota remaining
+    const availableSections = sections.filter(section => {
+      if (!section.maxWins || section.maxWins === 0) {
+        // Sections without quota (like "Better Luck Next Time") are always available
+        return true;
+      }
+      // Sections with quota are available if they haven't reached their limit
+      return (section.currentWins || 0) < section.maxWins;
+    });
+
+    if (availableSections.length === 0) {
+      // No sections available - all quotas exhausted
+      return null;
+    }
+
+    // Prioritize sections with amounts (prizes) if available
+    const prizeSections = availableSections.filter(section => 
+      section.amount && section.amount > 0 && section.maxWins && section.maxWins > 0
+    );
+    
+    const nonPrizeSections = availableSections.filter(section => 
+      !section.amount || section.amount === 0 || !section.maxWins || section.maxWins === 0
     );
 
-    if (affordablePrizes.length === 0) {
-      // No affordable prizes - check if there are any non-amount sections
-      const nonAmountSections = sections.filter(section => section.amount === null);
-      if (nonAmountSections.length > 0) {
-        return getRandomWinnerFromSections(nonAmountSections);
-      }
-      return null;
+    // If we have prize sections with quota remaining, select from them
+    if (prizeSections.length > 0) {
+      return getRandomWinnerFromSections(prizeSections);
     }
 
-    // Select from affordable prizes based on budget distribution strategy
-    return selectOptimalPrize(affordablePrizes, remainingBudget, remainingWinners);
+    // Otherwise, select from non-prize sections (like "Better Luck Next Time")
+    if (nonPrizeSections.length > 0) {
+      return getRandomWinnerFromSections(nonPrizeSections);
+    }
+
+    // Fallback to any available section
+    return getRandomWinnerFromSections(availableSections);
   };
 
   // Traditional random selection based on wheel position
@@ -199,28 +207,6 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
     return availableSections[randomIndex];
   };
 
-  // Optimal prize selection for controlled distribution
-  const selectOptimalPrize = (
-    affordablePrizes: WheelSection[], 
-    remainingBudget: number, 
-    remainingWinners: number
-  ): WheelSection => {
-    // Strategy: Try to distribute budget optimally across remaining winners
-    const averageBudgetPerWinner = remainingBudget / remainingWinners;
-    
-    // Find prizes close to the average budget per winner
-    const optimalPrizes = affordablePrizes.filter(section => {
-      const amount = section.amount || 0;
-      return amount <= averageBudgetPerWinner * 1.2; // Allow 20% variance
-    });
-
-    if (optimalPrizes.length > 0) {
-      return getRandomWinnerFromSections(optimalPrizes);
-    }
-
-    // Fallback to any affordable prize
-    return getRandomWinnerFromSections(affordablePrizes);
-  };
 
   const spinWheel = () => {
     if (isSpinning || sections.length === 0) return;

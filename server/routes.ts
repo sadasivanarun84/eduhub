@@ -95,6 +95,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put("/api/wheel-sections/:id", async (req, res) => {
+    try {
+      const section = await storage.updateWheelSection(req.params.id, req.body);
+      res.json(section);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update wheel section" });
+    }
+  });
+
   app.delete("/api/wheel-sections/:id", async (req, res) => {
     try {
       await storage.deleteWheelSection(req.params.id);

@@ -68,6 +68,23 @@ export function WheelControls({ sections, isLoading, onSectionsUpdate }: WheelCo
     },
   });
 
+  const updateSectionMutation = useMutation({
+    mutationFn: async ({ id, maxWins }: { id: string; maxWins: number }) => {
+      return apiRequest("PUT", `/api/wheel-sections/${id}`, { maxWins });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/wheel-sections"] });
+      onSectionsUpdate();
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update section quota. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const clearAllMutation = useMutation({
     mutationFn: async () => {
       return apiRequest("DELETE", "/api/wheel-sections");
@@ -192,16 +209,40 @@ export function WheelControls({ sections, isLoading, onSectionsUpdate }: WheelCo
                 className="section-item p-3 rounded-lg border border-border flex items-center justify-between"
                 data-testid={`section-item-${section.id}`}
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-1">
                   <div
                     className="w-4 h-4 rounded-full"
                     style={{ backgroundColor: section.color }}
                   />
-                  <span>{section.text}</span>
+                  <span className="flex-1">{section.text}</span>
                   {section.amount && (
-                    <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full">
-                      ${section.amount.toLocaleString()}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full">
+                        ${section.amount.toLocaleString()}
+                      </span>
+                      <div className="flex items-center gap-1 text-xs">
+                        <span className="text-muted-foreground">Quota:</span>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={section.maxWins || 0}
+                          onChange={(e) => {
+                            const newMaxWins = parseInt(e.target.value) || 0;
+                            updateSectionMutation.mutate({
+                              id: section.id,
+                              maxWins: newMaxWins,
+                            });
+                          }}
+                          className="w-16 h-6 text-xs"
+                          data-testid={`input-quota-${section.id}`}
+                        />
+                        {section.maxWins && section.maxWins > 0 && (
+                          <span className="text-xs text-muted-foreground">
+                            ({section.currentWins || 0}/{section.maxWins})
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
                 <Button

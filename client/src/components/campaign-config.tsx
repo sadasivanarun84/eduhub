@@ -19,7 +19,6 @@ export function CampaignConfig({ onCampaignUpdate }: CampaignConfigProps) {
     name: "",
     totalAmount: null,
     totalWinners: 10,
-    threshold: null,
   });
 
   const queryClient = useQueryClient();
@@ -40,7 +39,6 @@ export function CampaignConfig({ onCampaignUpdate }: CampaignConfigProps) {
         name: activeCampaign.name,
         totalAmount: activeCampaign.totalAmount,
         totalWinners: activeCampaign.totalWinners,
-        threshold: activeCampaign.threshold,
       });
     }
   }, [activeCampaign]);
@@ -116,14 +114,6 @@ export function CampaignConfig({ onCampaignUpdate }: CampaignConfigProps) {
       return;
     }
 
-    if (formData.threshold && formData.totalAmount && formData.threshold >= formData.totalAmount) {
-      toast({
-        title: "Validation Error",
-        description: "Threshold must be less than total amount.",
-        variant: "destructive",
-      });
-      return;
-    }
 
     if (activeCampaign) {
       updateCampaignMutation.mutate(formData);
@@ -229,33 +219,18 @@ export function CampaignConfig({ onCampaignUpdate }: CampaignConfigProps) {
 
             <Separator />
 
-            {/* Threshold Configuration */}
+            {/* Quota Information */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                 <Target className="w-4 h-4" />
-                Threshold Settings
+                Quota System
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="threshold" className="text-sm">
-                  Threshold Amount (Optional)
-                </Label>
-                <Input
-                  id="threshold"
-                  type="number"
-                  placeholder="e.g., 200000"
-                  value={formData.threshold || ""}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (isValidPrizeAmount(value)) {
-                      handleInputChange("threshold", value ? Number(value) : null);
-                    }
-                  }}
-                  className="w-full"
-                  data-testid="input-threshold"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Random distribution until this amount is reached, then controlled distribution for remaining budget
+              <div className="bg-muted/50 p-4 rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  Configure individual prize quotas in the Wheel tab. Set how many times each prize can be won.
+                  <br /><br />
+                  Example: 5 winners of $10k, 2 winners of $50k, 3 winners of $20k, etc.
                 </p>
               </div>
             </div>

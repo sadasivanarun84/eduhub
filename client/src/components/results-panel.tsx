@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import type { SpinResult, Campaign } from "@shared/schema";
+import type { SpinResult, Campaign, WheelSection } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 
 interface ResultsPanelProps {
@@ -27,6 +27,11 @@ export function ResultsPanel({ currentResult }: ResultsPanelProps) {
   const { data: activeCampaign } = useQuery<Campaign>({
     queryKey: ["/api/campaigns/active"],
     retry: false,
+  });
+
+  // Fetch wheel sections for quota tracking
+  const { data: wheelSections = [] } = useQuery<WheelSection[]>({
+    queryKey: ["/api/wheel-sections"],
   });
 
   const clearHistoryMutation = useMutation({
@@ -81,12 +86,10 @@ export function ResultsPanel({ currentResult }: ResultsPanelProps) {
                   {activeCampaign.name}
                 </h4>
                 <Badge 
-                  variant={activeCampaign.threshold && (activeCampaign.currentSpent ?? 0) >= activeCampaign.threshold ? "default" : "secondary"}
-                  data-testid="badge-threshold-status"
+                  variant="secondary"
+                  data-testid="badge-quota-status"
                 >
-                  {activeCampaign.threshold && (activeCampaign.currentSpent ?? 0) >= activeCampaign.threshold 
-                    ? "🎯 Threshold Reached" 
-                    : "🔄 Random Mode"}
+                  📊 Quota System
                 </Badge>
               </div>
 
@@ -128,19 +131,40 @@ export function ResultsPanel({ currentResult }: ResultsPanelProps) {
                 </div>
               </div>
 
-              {/* Threshold Information */}
-              {activeCampaign.threshold && (
+              {/* Prize Quotas Information */}
+              {wheelSections.filter(section => section.amount && section.maxWins && section.maxWins > 0).length > 0 && (
                 <div className="border-t pt-3 mt-3">
-                  <div className="flex justify-between text-sm">
-                    <span>Threshold Setting</span>
-                    <span data-testid="text-threshold-amount">
-                      ${activeCampaign.threshold.toFixed(2)}
-                    </span>
+                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-3">
+                    <span>🎁</span>
+                    Prize Quotas
                   </div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {(activeCampaign.currentSpent ?? 0) >= activeCampaign.threshold 
-                      ? "✅ Intelligent prize distribution is now active"
-                      : "⏳ Random distribution until threshold is reached"}
+                  <div className="space-y-2">
+                    {wheelSections
+                      .filter(section => section.amount && section.maxWins && section.maxWins > 0)
+                      .map(section => (
+                        <div key={section.id} className="flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: section.color }}
+                            />
+                            <span>${section.amount?.toLocaleString()}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Progress 
+                              value={section.maxWins ? ((section.currentWins || 0) / section.maxWins) * 100 : 0}
+                              className="w-16 h-1"
+                            />
+                            <span className="text-xs text-muted-foreground w-12">
+                              {section.currentWins || 0}/{section.maxWins}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    }
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-2">
+                    ✅ Quota-based prize distribution is active
                   </div>
                 </div>
               )}
