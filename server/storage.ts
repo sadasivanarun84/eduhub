@@ -26,7 +26,7 @@ export interface IStorage {
   clearSpinResults(campaignId?: string): Promise<void>;
   
   // Rotation sequence
-  getNextWinnerFromSequence(campaignId: string): Promise<WheelSection | null>;
+  getNextWinnerFromSequence(campaignId: string): Promise<{ section: WheelSection; visualIndex: number } | null>;
   advanceSequenceIndex(campaignId: string): Promise<void>;
   
   // Campaign reset
@@ -70,11 +70,14 @@ export class MemStorage implements IStorage {
   }
 
   // Generate rotation sequence based on wheel sections and their quotas
-  private generateRotationSequence(wheelSections: WheelSection[]): string[] {
-    const sequence: string[] = [];
+  private generateRotationSequence(wheelSections: WheelSection[]): number[] {
+    const sequence: number[] = [];
+    
+    // Sort sections by order to get correct visual positions
+    const sortedSections = [...wheelSections].sort((a, b) => a.order - b.order);
     
     // Filter sections that have quotas set
-    const sectionsWithQuotas = wheelSections.filter(section => 
+    const sectionsWithQuotas = sortedSections.filter(section => 
       section.maxWins && section.maxWins > 0
     );
     
@@ -83,12 +86,14 @@ export class MemStorage implements IStorage {
       return [];
     }
     
-    // Create array with section IDs repeated according to their quotas
-    const sectionPool: string[] = [];
+    // Create array with section indexes repeated according to their quotas
+    const sectionPool: number[] = [];
     sectionsWithQuotas.forEach(section => {
+      // Find the visual index of this section in the sorted array
+      const visualIndex = sortedSections.findIndex(s => s.id === section.id);
       const quota = section.maxWins || 0;
       for (let i = 0; i < quota; i++) {
-        sectionPool.push(section.id);
+        sectionPool.push(visualIndex);
       }
     });
     
@@ -99,11 +104,17 @@ export class MemStorage implements IStorage {
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
     
+    console.log('Generated rotation sequence:', shuffled);
+    console.log('Sequence corresponds to sections:', shuffled.map(index => {
+      const section = sortedSections[index];
+      return section ? `${section.text}(${section.amount || 'no amount'})` : 'invalid';
+    }));
+    
     return shuffled;
   }
 
   // Get the next winner from the rotation sequence
-  async getNextWinnerFromSequence(campaignId: string): Promise<WheelSection | null> {
+  async getNextWinnerFromSequence(campaignId: string): Promise<{ section: WheelSection; visualIndex: number } | null> {
     const campaign = this.campaigns.get(campaignId);
     if (!campaign || !campaign.rotationSequence || campaign.rotationSequence.length === 0) {
       return null;
@@ -115,8 +126,11 @@ export class MemStorage implements IStorage {
       return null; // All prizes have been distributed
     }
 
-    const nextSectionId = campaign.rotationSequence[currentIndex];
-    const nextSection = this.wheelSections.get(nextSectionId);
+    const visualIndex = campaign.rotationSequence[currentIndex];
+    
+    // Get all sections for this campaign, sorted by order
+    const wheelSections = await this.getWheelSections(campaignId);
+    const nextSection = wheelSections[visualIndex];
 
     if (!nextSection) {
       // Section was deleted, advance the sequence index
@@ -124,7 +138,8 @@ export class MemStorage implements IStorage {
       return this.getNextWinnerFromSequence(campaignId);
     }
 
-    return nextSection;
+    console.log(`Next from sequence: ${nextSection.text}(${nextSection.amount || 'no amount'}) at visual index ${visualIndex}`);
+    return { section: nextSection, visualIndex };
   }
 
   // Advance the sequence index after a spin

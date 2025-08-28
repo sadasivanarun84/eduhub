@@ -32,6 +32,12 @@ export function CampaignConfig({ onCampaignUpdate }: CampaignConfigProps) {
     retry: false,
   });
 
+  // Fetch wheel sections for sequence display
+  const { data: wheelSections = [] } = useQuery({
+    queryKey: ["/api/wheel-sections"],
+    enabled: !!activeCampaign,
+  });
+
   // Update form when active campaign loads
   useEffect(() => {
     if (activeCampaign) {
@@ -324,6 +330,51 @@ export function CampaignConfig({ onCampaignUpdate }: CampaignConfigProps) {
                   <RotateCcw className="w-4 h-4 mr-2" />
                   {resetCampaignMutation.isPending ? "Resetting..." : "Reset Campaign"}
                 </Button>
+              )}
+              
+              {/* Display generated sequence */}
+              {activeCampaign?.rotationSequence && activeCampaign.rotationSequence.length > 0 && wheelSections && (
+                <div className="space-y-3 pt-4 border-t">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-medium">Generated Sequence</h4>
+                    <span className="text-xs text-muted-foreground">
+                      {activeCampaign.rotationSequence.length} prizes total
+                    </span>
+                  </div>
+                  <div className="max-h-32 overflow-y-auto border rounded-md p-3 bg-muted/50">
+                    <div className="flex flex-wrap gap-2">
+                      {activeCampaign.rotationSequence.map((sectionIndex, sequenceIndex) => {
+                        const section = wheelSections[sectionIndex];
+                        const isCurrentWinner = sequenceIndex === (activeCampaign.currentSequenceIndex ?? 0);
+                        const isCompleted = sequenceIndex < (activeCampaign.currentSequenceIndex ?? 0);
+                        return (
+                          <span
+                            key={sequenceIndex}
+                            className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                              isCurrentWinner
+                                ? 'bg-primary text-primary-foreground'
+                                : sequenceIndex < activeCampaign.currentSequenceIndex
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                : 'bg-secondary text-secondary-foreground'
+                            }`}
+                          >
+                            {section ? `${section.text}($${section.amount || 0})` : `Unknown(${sectionIndex})`}
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-2 pt-2 border-t">
+                      <p className="text-xs text-muted-foreground">
+                        <span className="inline-block w-3 h-3 bg-green-100 dark:bg-green-900 rounded mr-2"></span>
+                        Won •
+                        <span className="inline-block w-3 h-3 bg-primary rounded mr-2 ml-2"></span>
+                        Next •
+                        <span className="inline-block w-3 h-3 bg-secondary rounded mr-2 ml-2"></span>
+                        Pending
+                      </p>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           </form>

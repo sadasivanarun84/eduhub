@@ -10,7 +10,7 @@ export const campaigns = pgTable("campaigns", {
   totalWinners: integer("total_winners").notNull(),
   currentSpent: integer("current_spent").default(0),
   currentWinners: integer("current_winners").default(0),
-  rotationSequence: json("rotation_sequence").$type<string[]>().default([]), // Array of section IDs in rotation order
+  rotationSequence: json("rotation_sequence").$type<number[]>().default([]), // Array of section indexes in rotation order
   currentSequenceIndex: integer("current_sequence_index").default(0), // Current position in rotation sequence
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),

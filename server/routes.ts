@@ -180,8 +180,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Rotation sequence routes
   app.get("/api/campaigns/:id/next-winner", async (req, res) => {
     try {
-      const nextWinner = await storage.getNextWinnerFromSequence(req.params.id);
-      res.json(nextWinner);
+      const result = await storage.getNextWinnerFromSequence(req.params.id);
+      if (!result) {
+        return res.status(404).json({ message: "No more winners in sequence" });
+      }
+      res.json(result);
     } catch (error) {
       res.status(500).json({ message: "Failed to get next winner" });
     }

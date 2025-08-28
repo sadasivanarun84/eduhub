@@ -133,7 +133,7 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
   };
 
   // Get next winner from rotation sequence
-  const getNextWinnerFromSequence = async (): Promise<WheelSection | null> => {
+  const getNextWinnerFromSequence = async (): Promise<{ section: WheelSection; visualIndex: number } | null> => {
     if (!activeCampaign) return null;
     
     try {
@@ -141,17 +141,18 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      const winner = await response.json();
+      const result = await response.json();
       console.log('=== SEQUENCE DEBUG ===');
-      console.log('Winner from sequence:', winner ? `${winner.text}(${winner.amount || 'no amount'})` : 'null');
-      console.log('Winner ID:', winner?.id);
+      console.log('Winner from sequence:', result ? `${result.section.text}(${result.section.amount || 'no amount'}) at index ${result.visualIndex}` : 'null');
       console.log('====================');
-      return winner;
+      return result;
     } catch (error) {
       console.error("Failed to get next winner:", error);
       // Fallback to random selection if sequence fails
       if (sections.length > 0) {
-        return sections[Math.floor(Math.random() * sections.length)];
+        const randomSection = sections[Math.floor(Math.random() * sections.length)];
+        const randomIndex = sections.findIndex(s => s.id === randomSection.id);
+        return { section: randomSection, visualIndex: randomIndex };
       }
       return null;
     }
@@ -173,29 +174,24 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
     }
   };
 
-  // Calculate the rotation needed to land on a specific section
-  const getTargetRotationForSection = (targetSection: WheelSection): number => {
-    const sectionIndex = sections.findIndex(s => s.id === targetSection.id);
-    if (sectionIndex === -1) {
-      console.error('Target section not found in sections array:', targetSection);
+  // Calculate the rotation needed to land on a specific section using visual index
+  const getTargetRotationForSection = (visualIndex: number, targetSection: WheelSection): number => {
+    if (visualIndex < 0 || visualIndex >= sections.length) {
+      console.error('Invalid visual index:', visualIndex);
       return currentRotation;
     }
 
     console.log('=== ROTATION DEBUG ===');
     console.log('Target section:', targetSection.text, 'Amount:', targetSection.amount);
-    console.log('Section index in array:', sectionIndex);
+    console.log('Visual index:', visualIndex);
     console.log('Total sections:', sections.length);
     console.log('All sections:', sections.map((s, i) => `${i}: ${s.text}(${s.amount || 'no amount'})`));
 
     const sectionAngle = (2 * Math.PI) / sections.length;
     const pointerAngle = -Math.PI / 2; // Pointer points up (top of circle)
     
-    // When wheel rotates by currentRotation, section i is at: (i * sectionAngle) + currentRotation
-    // The midpoint of section i is at: (i * sectionAngle) + currentRotation + (sectionAngle/2)
-    // For pointer to point at this section: (i * sectionAngle) + finalRotation + (sectionAngle/2) = pointerAngle
-    // Therefore: finalRotation = pointerAngle - (i * sectionAngle) - (sectionAngle/2)
-    
-    const sectionMidpointOffset = sectionIndex * sectionAngle + (sectionAngle / 2);
+    // Calculate the midpoint of the target section at visual index
+    const sectionMidpointOffset = visualIndex * sectionAngle + (sectionAngle / 2);
     const targetRotationOffset = pointerAngle - sectionMidpointOffset;
     
     console.log('Section angle:', sectionAngle * (180 / Math.PI), 'degrees');
@@ -208,8 +204,8 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
       normalizedOffset += 2 * Math.PI;
     }
     
-    // Add multiple rotations for visual effect (3-8 full rotations)
-    const baseRotations = Math.random() * 5 + 3;
+    // Add multiple rotations for visual effect (at least 5 full rotations as requested)
+    const baseRotations = Math.random() * 3 + 5; // 5-8 rotations
     const finalRotation = currentRotation + (baseRotations * 2 * Math.PI) + normalizedOffset;
     
     console.log('Final rotation:', finalRotation);
@@ -258,16 +254,17 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
     setIsSpinning(true);
 
     // Get the next winner from the rotation sequence
-    const selectedWinner = await getNextWinnerFromSequence();
+    const winnerResult = await getNextWinnerFromSequence();
     
-    if (!selectedWinner) {
+    if (!winnerResult) {
       setIsSpinning(false);
       return;
     }
 
+    const { section: selectedWinner, visualIndex } = winnerResult;
     const duration = spinDuration[0] * 1000; // Convert to milliseconds
     // Calculate the exact rotation needed to land on the selected winner
-    const finalRotation = getTargetRotationForSection(selectedWinner);
+    const finalRotation = getTargetRotationForSection(visualIndex, selectedWinner);
 
     let startTime: number;
 
