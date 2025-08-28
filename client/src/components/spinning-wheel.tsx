@@ -132,8 +132,8 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
     ctx.stroke();
   };
 
-  // Intelligent winner selection based on quota system
-  const determineWinner = (finalRotation: number): WheelSection | null => {
+  // Intelligent winner selection based on quota system - called BEFORE spinning
+  const selectWinnerWithQuota = (): WheelSection | null => {
     if (sections.length === 0) return null;
 
     // Check if we have campaign with quota constraints
@@ -141,8 +141,8 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
       sections.some(section => section.maxWins && section.maxWins > 0);
 
     if (!hasQuotaConstraints) {
-      // No quota constraints - use traditional random selection
-      return getRandomWinner(finalRotation);
+      // No quota constraints - select randomly from all sections
+      return sections[Math.floor(Math.random() * sections.length)];
     }
 
     // Quota-based selection logic
@@ -192,13 +192,22 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
     return getRandomWinnerFromSections(availableSections);
   };
 
-  // Traditional random selection based on wheel position
-  const getRandomWinner = (finalRotation: number): WheelSection => {
-    const pointerAngle = -Math.PI / 2;
+  // Calculate the rotation needed to land on a specific section
+  const getTargetRotationForSection = (targetSection: WheelSection): number => {
+    const sectionIndex = sections.findIndex(s => s.id === targetSection.id);
+    if (sectionIndex === -1) return 0;
+
     const sectionAngle = (2 * Math.PI) / sections.length;
-    const angleFromSection0 = (pointerAngle - finalRotation + 2 * Math.PI) % (2 * Math.PI);
-    const winnerIndex = Math.floor(angleFromSection0 / sectionAngle);
-    return sections[winnerIndex];
+    const pointerAngle = -Math.PI / 2; // Pointer points up
+    
+    // Calculate the angle where this section should be when pointer points to it
+    const targetAngle = sectionIndex * sectionAngle + (sectionAngle / 2);
+    
+    // Add multiple rotations for visual effect (3-8 full rotations)
+    const baseRotations = Math.random() * 5 + 3;
+    const totalRotation = (baseRotations * 2 * Math.PI) + (pointerAngle - targetAngle);
+    
+    return currentRotation + totalRotation;
   };
 
   // Random selection from a specific set of sections
@@ -213,9 +222,17 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
 
     setIsSpinning(true);
 
+    // First, select the winner using quota logic
+    const selectedWinner = selectWinnerWithQuota();
+    
+    if (!selectedWinner) {
+      setIsSpinning(false);
+      return;
+    }
+
     const duration = spinDuration[0] * 1000; // Convert to milliseconds
-    const spinRotations = Math.random() * 5 + 3; // 3-8 full rotations
-    const finalRotation = currentRotation + (spinRotations * 2 * Math.PI);
+    // Calculate the exact rotation needed to land on the selected winner
+    const finalRotation = getTargetRotationForSection(selectedWinner);
 
     let startTime: number;
 
@@ -236,21 +253,15 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
         const finalRot = finalRotation % (2 * Math.PI);
         setCurrentRotation(finalRot);
 
-        // Determine winner using intelligent selection
-        const winner = determineWinner(finalRot);
-
-        if (winner) {
-          setTimeout(() => {
-            onSpinComplete(winner.text);
-            recordSpinMutation.mutate({ 
-              winner: winner.text, 
-              amount: winner.amount || undefined 
-            });
-            setIsSpinning(false);
-          }, 500);
-        } else {
+        // Winner was already determined before spinning
+        setTimeout(() => {
+          onSpinComplete(selectedWinner.text);
+          recordSpinMutation.mutate({ 
+            winner: selectedWinner.text, 
+            amount: selectedWinner.amount || undefined 
+          });
           setIsSpinning(false);
-        }
+        }, 500);
       }
     };
 
