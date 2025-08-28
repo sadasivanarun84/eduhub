@@ -142,6 +142,10 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const winner = await response.json();
+      console.log('=== SEQUENCE DEBUG ===');
+      console.log('Winner from sequence:', winner ? `${winner.text}(${winner.amount || 'no amount'})` : 'null');
+      console.log('Winner ID:', winner?.id);
+      console.log('====================');
       return winner;
     } catch (error) {
       console.error("Failed to get next winner:", error);
@@ -177,6 +181,12 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
       return currentRotation;
     }
 
+    console.log('=== ROTATION DEBUG ===');
+    console.log('Target section:', targetSection.text, 'Amount:', targetSection.amount);
+    console.log('Section index in array:', sectionIndex);
+    console.log('Total sections:', sections.length);
+    console.log('All sections:', sections.map((s, i) => `${i}: ${s.text}(${s.amount || 'no amount'})`));
+
     const sectionAngle = (2 * Math.PI) / sections.length;
     const pointerAngle = -Math.PI / 2; // Pointer points up (top of circle)
     
@@ -188,6 +198,10 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
     const sectionMidpointOffset = sectionIndex * sectionAngle + (sectionAngle / 2);
     const targetRotationOffset = pointerAngle - sectionMidpointOffset;
     
+    console.log('Section angle:', sectionAngle * (180 / Math.PI), 'degrees');
+    console.log('Section midpoint offset:', sectionMidpointOffset * (180 / Math.PI), 'degrees');
+    console.log('Target rotation offset:', targetRotationOffset * (180 / Math.PI), 'degrees');
+    
     // Normalize to ensure we rotate in the positive direction
     let normalizedOffset = targetRotationOffset;
     while (normalizedOffset <= 0) {
@@ -198,6 +212,8 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
     const baseRotations = Math.random() * 5 + 3;
     const finalRotation = currentRotation + (baseRotations * 2 * Math.PI) + normalizedOffset;
     
+    console.log('Final rotation:', finalRotation);
+    console.log('==================');
     return finalRotation;
   };
 
