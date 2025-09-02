@@ -123,8 +123,9 @@ export class MemStorage implements IStorage {
     };
     this.diceCampaigns.set(diceCampaignId, defaultDiceCampaign);
 
-    // Create default dice faces with standard colors
-    const defaultColors = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#3b82f6", "#8b5cf6"];
+    // Create default dice faces with white background and black text
+    const defaultColors = ["#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff"];
+    const defaultTextColors = ["#000000", "#000000", "#000000", "#000000", "#000000", "#000000"];
     const defaultPrizes = ["$10", "$20", "$50", "$100", "$500", "$1000"];
     
     for (let i = 1; i <= 6; i++) {
@@ -135,6 +136,7 @@ export class MemStorage implements IStorage {
         faceNumber: i,
         text: defaultPrizes[i - 1],
         color: defaultColors[i - 1],
+        textColor: defaultTextColors[i - 1],
         amount: defaultPrizes[i - 1],
         maxWins: 0, // No quota by default
         currentWins: 0,

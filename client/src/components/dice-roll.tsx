@@ -96,7 +96,11 @@ export function DiceRoll({ faces, disabled, activeCampaign }: DiceRollProps) {
   };
 
   const getFaceData = (faceNumber: number) => {
-    return faces.find(f => f.faceNumber === faceNumber) || { text: faceNumber.toString(), color: "#666" };
+    return faces.find(f => f.faceNumber === faceNumber) || { 
+      text: faceNumber.toString(), 
+      color: "#ffffff", 
+      textColor: "#000000" 
+    };
   };
 
   return (
@@ -123,6 +127,7 @@ export function DiceRoll({ faces, disabled, activeCampaign }: DiceRollProps) {
                 position: "relative",
                 transformStyle: "preserve-3d",
                 margin: "40px",
+                borderRadius: "8px",
               }}
             >
               {/* Dice Faces */}
@@ -140,9 +145,10 @@ export function DiceRoll({ faces, disabled, activeCampaign }: DiceRollProps) {
                 return (
                   <div
                     key={faceNumber}
-                    className="dice-face absolute w-full h-full border border-gray-400 flex items-center justify-center text-white font-bold text-sm"
+                    className="dice-face absolute w-full h-full border border-gray-400 flex items-center justify-center font-bold text-sm rounded-lg"
                     style={{
                       backgroundColor: faceData.color,
+                      color: faceData.textColor || "#000000",
                       ...faceStyles[faceNumber as keyof typeof faceStyles],
                     }}
                     data-testid={`dice-face-${faceNumber}`}

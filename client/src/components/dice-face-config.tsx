@@ -14,7 +14,8 @@ import type { DiceFace, DiceCampaign } from "@shared/schema";
 
 const diceFaceSchema = z.object({
   text: z.string().min(1, "Prize text is required"),
-  color: z.string().min(1, "Color is required"),
+  color: z.string().min(1, "Background color is required"),
+  textColor: z.string().min(1, "Text color is required"),
   amount: z.string().optional(),
   maxWins: z.coerce.number().min(0, "Max wins must be 0 or greater").optional(),
 });
@@ -40,7 +41,8 @@ export function DiceFaceConfig({ activeCampaign }: DiceFaceConfigProps) {
     resolver: zodResolver(diceFaceSchema),
     defaultValues: {
       text: "",
-      color: "#ef4444",
+      color: "#ffffff",
+      textColor: "#000000",
       amount: "",
       maxWins: 0,
     },
@@ -74,6 +76,7 @@ export function DiceFaceConfig({ activeCampaign }: DiceFaceConfigProps) {
       text: face.text,
       color: face.color,
       amount: face.amount || "",
+      textColor: face.textColor || "#000000",
       maxWins: face.maxWins || 0,
     });
   };
@@ -86,6 +89,7 @@ export function DiceFaceConfig({ activeCampaign }: DiceFaceConfigProps) {
       updates: {
         text: data.text,
         color: data.color,
+        textColor: data.textColor,
         amount: data.amount || null,
         maxWins: data.maxWins || 0,
       },
@@ -177,7 +181,11 @@ export function DiceFaceConfig({ activeCampaign }: DiceFaceConfigProps) {
                     </Badge>
                   </div>
                   <div className="space-y-1">
-                    <div className="font-medium text-sm" data-testid={`text-face-prize-${face.faceNumber}`}>
+                    <div 
+                      className="font-medium text-sm p-2 rounded border" 
+                      style={{ backgroundColor: face.color, color: face.textColor || "#000000" }}
+                      data-testid={`text-face-prize-${face.faceNumber}`}
+                    >
                       {face.text}
                     </div>
                     {face.amount && (
@@ -231,7 +239,7 @@ export function DiceFaceConfig({ activeCampaign }: DiceFaceConfigProps) {
                   name="color"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Color</FormLabel>
+                      <FormLabel>Background Color</FormLabel>
                       <FormControl>
                         <div className="flex items-center gap-2">
                           <Input 
@@ -242,10 +250,38 @@ export function DiceFaceConfig({ activeCampaign }: DiceFaceConfigProps) {
                           />
                           <Input 
                             type="text" 
-                            placeholder="#000000" 
+                            placeholder="#ffffff" 
                             {...field}
                             className="flex-1"
                             data-testid="input-face-color-text"
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="textColor"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Text Color</FormLabel>
+                      <FormControl>
+                        <div className="flex items-center gap-2">
+                          <Input 
+                            type="color" 
+                            {...field} 
+                            className="w-16 h-10 p-1 rounded"
+                            data-testid="input-face-text-color"
+                          />
+                          <Input 
+                            type="text" 
+                            placeholder="#000000" 
+                            {...field}
+                            className="flex-1"
+                            data-testid="input-face-text-color-text"
                           />
                         </div>
                       </FormControl>

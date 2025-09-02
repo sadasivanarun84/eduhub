@@ -56,6 +56,7 @@ export const diceFaces = pgTable("dice_faces", {
   faceNumber: integer("face_number").notNull(), // 1-6
   text: text("text").notNull(),
   color: text("color").notNull(),
+  textColor: text("text_color").notNull().default("#000000"), // Text color
   amount: text("amount"), // Prize value (can be money or items)
   maxWins: integer("max_wins").default(0), // Maximum times this prize can be won
   currentWins: integer("current_wins").default(0), // Current times this prize has been won
@@ -104,6 +105,7 @@ export const insertDiceFaceSchema = createInsertSchema(diceFaces).pick({
   faceNumber: true,
   text: true,
   color: true,
+  textColor: true,
   amount: true,
   maxWins: true,
 });
