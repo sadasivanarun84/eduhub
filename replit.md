@@ -1,6 +1,10 @@
 # Overview
 
-This is a modern spinning wheel application built with React and Express. Users can create custom spinning wheels by adding colorful sections with text, spin the wheel to get random results, and view their spin history. The app features a sleek dark-themed UI with animations and provides both wheel customization and results tracking functionality.
+This is a multi-game platform featuring various interactive games and tools. The main attraction is a sophisticated spinning wheel application with quota-based campaign management. The platform is designed to support multiple games with a centralized home page for easy navigation.
+
+## Current Games
+- **Spinning Wheel** (`/spinwheel`): Advanced wheel with quota-based campaigns, frequency control, and predetermined sequence generation
+- **Future Games**: Trivia, Lucky Draw, Bingo Cards, Slot Machine (coming soon)
 
 # User Preferences
 
@@ -13,7 +17,9 @@ Preferred communication style: Simple, everyday language.
 - **UI Library**: Shadcn/ui components built on Radix UI primitives
 - **Styling**: Tailwind CSS with a custom dark theme and CSS variables for theming
 - **State Management**: TanStack Query (React Query) for server state management
-- **Routing**: Wouter for lightweight client-side routing
+- **Routing**: Wouter for lightweight client-side routing with multi-page structure:
+  - `/` - Home page with games menu
+  - `/spinwheel` - Spinning wheel game application
 - **Canvas Rendering**: HTML5 Canvas API for drawing the spinning wheel with custom animations
 
 ## Backend Architecture

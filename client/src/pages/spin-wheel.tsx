@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { SpinningWheel } from "@/components/spinning-wheel";
 import { WheelControls } from "@/components/wheel-controls";
 import { ResultsPanel } from "@/components/results-panel";
 import { CampaignConfig } from "@/components/campaign-config";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
 import type { WheelSection } from "@shared/schema";
 
 export default function SpinWheelPage() {
@@ -20,6 +23,16 @@ export default function SpinWheelPage() {
 
   return (
     <div className="min-h-screen p-4 lg:p-8" data-testid="spin-wheel-page">
+      {/* Navigation */}
+      <div className="mb-6">
+        <Link href="/">
+          <Button variant="ghost" className="gap-2" data-testid="button-back-home">
+            <ArrowLeft className="w-4 h-4" />
+            Back to Games
+          </Button>
+        </Link>
+      </div>
+
       {/* Header Section */}
       <header className="text-center mb-8 lg:mb-12">
         <h1 className="text-4xl lg:text-6xl font-bold bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent mb-4">
