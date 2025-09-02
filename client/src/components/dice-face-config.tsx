@@ -15,7 +15,7 @@ import type { DiceFace, DiceCampaign } from "@shared/schema";
 const diceFaceSchema = z.object({
   text: z.string().min(1, "Prize text is required"),
   color: z.string().min(1, "Color is required"),
-  amount: z.coerce.number().optional(),
+  amount: z.string().optional(),
   maxWins: z.coerce.number().min(0, "Max wins must be 0 or greater").optional(),
 });
 
@@ -41,7 +41,7 @@ export function DiceFaceConfig({ activeCampaign }: DiceFaceConfigProps) {
     defaultValues: {
       text: "",
       color: "#ef4444",
-      amount: 0,
+      amount: "",
       maxWins: 0,
     },
   });
@@ -57,8 +57,8 @@ export function DiceFaceConfig({ activeCampaign }: DiceFaceConfigProps) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/dice/faces"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dice/campaigns"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/dice/faces?campaignId=${activeCampaign?.id}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dice/campaigns/active"] });
       setEditingFace(null);
       form.reset();
       toast({ title: "Dice face updated successfully!" });
@@ -73,7 +73,7 @@ export function DiceFaceConfig({ activeCampaign }: DiceFaceConfigProps) {
     form.reset({
       text: face.text,
       color: face.color,
-      amount: face.amount || 0,
+      amount: face.amount || "",
       maxWins: face.maxWins || 0,
     });
   };
@@ -182,7 +182,7 @@ export function DiceFaceConfig({ activeCampaign }: DiceFaceConfigProps) {
                     </div>
                     {face.amount && (
                       <div className="text-xs text-green-600" data-testid={`text-face-amount-${face.faceNumber}`}>
-                        ${face.amount}
+                        {face.amount}
                       </div>
                     )}
                     <div className="text-xs text-muted-foreground" data-testid={`text-face-quota-${face.faceNumber}`}>
@@ -259,12 +259,11 @@ export function DiceFaceConfig({ activeCampaign }: DiceFaceConfigProps) {
                   name="amount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Prize Amount ($)</FormLabel>
+                      <FormLabel>Prize Value (optional)</FormLabel>
                       <FormControl>
                         <Input 
-                          type="number" 
-                          placeholder="0" 
-                          min="0"
+                          type="text" 
+                          placeholder="$100 or Free T-shirt" 
                           {...field} 
                           data-testid="input-face-amount"
                         />

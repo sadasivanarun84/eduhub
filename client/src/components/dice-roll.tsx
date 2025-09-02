@@ -178,7 +178,7 @@ export function DiceRoll({ faces, disabled }: DiceRollProps) {
                 </div>
                 {lastResult.amount && (
                   <div className="text-sm text-green-600" data-testid="text-last-amount">
-                    ${lastResult.amount}
+                    {lastResult.amount}
                   </div>
                 )}
                 <div className="text-xs text-muted-foreground" data-testid="text-last-face">

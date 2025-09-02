@@ -56,7 +56,7 @@ export const diceFaces = pgTable("dice_faces", {
   faceNumber: integer("face_number").notNull(), // 1-6
   text: text("text").notNull(),
   color: text("color").notNull(),
-  amount: integer("amount"), // Prize amount if applicable
+  amount: text("amount"), // Prize value (can be money or items)
   maxWins: integer("max_wins").default(0), // Maximum times this prize can be won
   currentWins: integer("current_wins").default(0), // Current times this prize has been won
   createdAt: timestamp("created_at").defaultNow(),
@@ -67,7 +67,7 @@ export const diceResults = pgTable("dice_results", {
   campaignId: varchar("campaign_id").references(() => diceCampaigns.id),
   winner: text("winner").notNull(),
   faceNumber: integer("face_number").notNull(), // Which face was rolled (1-6)
-  amount: integer("amount"), // Amount won
+  amount: text("amount"), // Prize value won
   timestamp: timestamp("timestamp").defaultNow(),
 });
 
