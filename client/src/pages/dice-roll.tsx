@@ -1,15 +1,17 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, History, Settings, Dice6 } from "lucide-react";
+import { ArrowLeft, History, Settings, Dice6, Menu, X } from "lucide-react";
 import { DiceRoll } from "@/components/dice-roll";
 import { DiceFaceConfig } from "@/components/dice-face-config";
 import type { DiceCampaign, DiceFace, DiceResult } from "@shared/schema";
 
 export function DiceRollPage() {
+  const [configPanelOpen, setConfigPanelOpen] = useState(false);
   const { data: activeCampaign, isLoading: campaignLoading } = useQuery<DiceCampaign>({
     queryKey: ["/api/dice/campaigns/active"],
   });
@@ -79,6 +81,14 @@ export function DiceRollPage() {
               </p>
             </div>
           </div>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setConfigPanelOpen(true)}
+            data-testid="button-open-config"
+          >
+            <Menu className="h-4 w-4" />
+          </Button>
         </div>
 
         {/* Campaign Status */}
@@ -116,9 +126,9 @@ export function DiceRollPage() {
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left Column: Dice Roll */}
-          <div className="space-y-6">
+        {/* Main Content */}
+        <div className="flex justify-center">
+          <div className="space-y-6 max-w-2xl w-full">
             <DiceRoll 
               faces={faces} 
               disabled={hasQuotas && remainingQuota <= 0}
@@ -136,12 +146,44 @@ export function DiceRollPage() {
               </Card>
             )}
           </div>
+        </div>
 
-          {/* Right Column: Configuration */}
-          <div className="space-y-6">
-            <DiceFaceConfig activeCampaign={activeCampaign} />
+        {/* Sliding Configuration Panel */}
+        <div 
+          className={`fixed top-0 right-0 h-full w-96 bg-background border-l border-border shadow-xl transform transition-transform duration-300 ease-in-out z-50 ${
+            configPanelOpen ? 'translate-x-0' : 'translate-x-full'
+          }`}
+          data-testid="config-panel"
+        >
+          <div className="h-full overflow-y-auto">
+            <div className="sticky top-0 bg-background border-b border-border p-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Settings className="h-5 w-5" />
+                Dice Configuration
+              </h2>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setConfigPanelOpen(false)}
+                data-testid="button-close-config"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="p-4">
+              <DiceFaceConfig activeCampaign={activeCampaign} />
+            </div>
           </div>
         </div>
+
+        {/* Overlay */}
+        {configPanelOpen && (
+          <div 
+            className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
+            onClick={() => setConfigPanelOpen(false)}
+            data-testid="config-panel-overlay"
+          />
+        )}
 
         <Separator />
 

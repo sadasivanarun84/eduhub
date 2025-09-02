@@ -145,7 +145,7 @@ export function DiceRoll({ faces, disabled, activeCampaign }: DiceRollProps) {
                 return (
                   <div
                     key={faceNumber}
-                    className="dice-face absolute w-full h-full border border-gray-400 flex items-center justify-center font-bold text-sm rounded-lg"
+                    className="dice-face absolute w-full h-full border border-gray-400 flex items-center justify-center font-bold text-sm rounded-lg text-center"
                     style={{
                       backgroundColor: faceData.color,
                       color: faceData.textColor || "#000000",
