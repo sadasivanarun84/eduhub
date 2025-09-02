@@ -188,31 +188,38 @@ export function SpinningWheel({ sections, onSpinComplete }: SpinningWheelProps) 
     console.log('All sections:', sections.map((s, i) => `${i}: ${s.text}(${s.amount || 'no amount'})`));
 
     const sectionAngle = (2 * Math.PI) / sections.length;
-    const pointerAngle = -Math.PI / 2; // Pointer points up (top of circle)
     
-    // For visual index i, the section's middle is at: i * sectionAngle + sectionAngle/2
-    // We want this to align with the pointer position after rotation
-    // So: (i * sectionAngle + sectionAngle/2) + finalRotation = pointerAngle + n*2π
-    // Therefore: finalRotation = pointerAngle - (i * sectionAngle + sectionAngle/2) + n*2π
-    const sectionMidpoint = visualIndex * sectionAngle + (sectionAngle / 2);
-    let targetRotation = pointerAngle - sectionMidpoint;
+    // The pointer is at the top of the wheel (12 o'clock position)
+    // Sections are drawn starting from index 0 at 0 degrees (3 o'clock) and go clockwise
+    // To have the pointer point at section with visualIndex, we need:
+    // sectionMiddle = visualIndex * sectionAngle + sectionAngle/2
+    // We want: currentRotation + additionalRotation = -sectionMiddle + pointerOffset
+    // Where pointerOffset = -π/2 (top of circle)
     
-    // Add rotations to make it positive and add visual effect (minimum 5 rotations)
+    const sectionMiddle = visualIndex * sectionAngle + (sectionAngle / 2);
+    const pointerOffset = -Math.PI / 2; // Pointer at top
+    
+    // Calculate the target final rotation
+    // We want the section middle to align with the pointer
+    let targetFinalRotation = pointerOffset - sectionMiddle;
+    
+    // Normalize to positive and add minimum rotations for visual effect
     const baseRotations = Math.floor(Math.random() * 3) + 5; // 5-7 full rotations
-    targetRotation += baseRotations * 2 * Math.PI;
+    targetFinalRotation += baseRotations * 2 * Math.PI;
     
-    // Ensure we're always rotating forward from current position
-    while (targetRotation <= currentRotation) {
-      targetRotation += 2 * Math.PI;
+    // Make sure we're rotating forward from current position
+    while (targetFinalRotation <= currentRotation) {
+      targetFinalRotation += 2 * Math.PI;
     }
     
     console.log('Section angle:', sectionAngle * (180 / Math.PI), 'degrees');
-    console.log('Section midpoint:', sectionMidpoint * (180 / Math.PI), 'degrees');
-    console.log('Target rotation:', targetRotation * (180 / Math.PI), 'degrees');
+    console.log('Section middle angle:', sectionMiddle * (180 / Math.PI), 'degrees');
+    console.log('Target final rotation:', targetFinalRotation * (180 / Math.PI), 'degrees');
     console.log('Current rotation:', currentRotation * (180 / Math.PI), 'degrees');
+    console.log('Additional rotation needed:', (targetFinalRotation - currentRotation) * (180 / Math.PI), 'degrees');
     console.log('==================');
     
-    return targetRotation;
+    return targetFinalRotation;
   };
 
   // Calculate which section is currently under the pointer
