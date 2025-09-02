@@ -13,6 +13,14 @@ export default function HomePage() {
       features: ["Quota-based prizes", "Campaign management", "Randomized sequences", "Prize tracking"],
       status: "Available"
     },
+    {
+      id: "diceroll",
+      title: "🎲 Dice Roll",
+      description: "Roll a customizable 6-sided dice with configurable prizes and quota management. Great for fair prize distribution with predetermined outcomes.",
+      path: "/diceroll",
+      features: ["6 configurable faces", "Quota-based system", "3D animations", "Prize tracking"],
+      status: "Available"
+    },
     // Future games will be added here
   ];
 

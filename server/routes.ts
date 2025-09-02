@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertWheelSectionSchema, insertSpinResultSchema, insertCampaignSchema } from "@shared/schema";
+import { insertWheelSectionSchema, insertSpinResultSchema, insertCampaignSchema, insertDiceCampaignSchema, insertDiceFaceSchema, insertDiceResultSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Campaign routes
@@ -196,6 +196,225 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Sequence advanced successfully" });
     } catch (error) {
       res.status(500).json({ message: "Failed to advance sequence" });
+    }
+  });
+
+  // ===============================
+  // DICE GAME ROUTES
+  // ===============================
+
+  // Dice Campaign routes
+  app.get("/api/dice/campaigns", async (req, res) => {
+    try {
+      const campaigns = await storage.getDiceCampaigns();
+      res.json(campaigns);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch dice campaigns" });
+    }
+  });
+
+  app.get("/api/dice/campaigns/active", async (req, res) => {
+    try {
+      const activeCampaign = await storage.getActiveDiceCampaign();
+      if (!activeCampaign) {
+        return res.status(404).json({ message: "No active dice campaign found" });
+      }
+      res.json(activeCampaign);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch active dice campaign" });
+    }
+  });
+
+  app.get("/api/dice/campaigns/:id", async (req, res) => {
+    try {
+      const campaign = await storage.getDiceCampaign(req.params.id);
+      if (!campaign) {
+        return res.status(404).json({ message: "Dice campaign not found" });
+      }
+      res.json(campaign);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch dice campaign" });
+    }
+  });
+
+  app.post("/api/dice/campaigns", async (req, res) => {
+    try {
+      const validatedData = insertDiceCampaignSchema.parse(req.body);
+      const campaign = await storage.createDiceCampaign(validatedData);
+      res.json(campaign);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid dice campaign data" });
+    }
+  });
+
+  app.put("/api/dice/campaigns/:id", async (req, res) => {
+    try {
+      const updates = req.body;
+      const campaign = await storage.updateDiceCampaign(req.params.id, updates);
+      res.json(campaign);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update dice campaign" });
+    }
+  });
+
+  app.delete("/api/dice/campaigns/:id", async (req, res) => {
+    try {
+      await storage.deleteDiceCampaign(req.params.id);
+      res.json({ message: "Dice campaign deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete dice campaign" });
+    }
+  });
+
+  app.post("/api/dice/campaigns/:id/reset", async (req, res) => {
+    try {
+      const resetCampaign = await storage.resetDiceCampaign(req.params.id);
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
+      res.json(resetCampaign);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to reset dice campaign" });
+    }
+  });
+
+  // Dice Face routes
+  app.get("/api/dice/faces", async (req, res) => {
+    try {
+      const campaignId = req.query.campaignId as string | undefined;
+      const faces = await storage.getDiceFaces(campaignId);
+      res.json(faces);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch dice faces" });
+    }
+  });
+
+  app.post("/api/dice/faces", async (req, res) => {
+    try {
+      const validatedData = insertDiceFaceSchema.parse(req.body);
+      const face = await storage.createDiceFace(validatedData);
+      res.json(face);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid dice face data" });
+    }
+  });
+
+  app.put("/api/dice/faces/:id", async (req, res) => {
+    try {
+      const updates = req.body;
+      const face = await storage.updateDiceFace(req.params.id, updates);
+      res.json(face);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update dice face" });
+    }
+  });
+
+  app.delete("/api/dice/faces/:id", async (req, res) => {
+    try {
+      await storage.deleteDiceFace(req.params.id);
+      res.json({ message: "Dice face deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete dice face" });
+    }
+  });
+
+  app.delete("/api/dice/faces", async (req, res) => {
+    try {
+      const campaignId = req.query.campaignId as string | undefined;
+      await storage.clearDiceFaces(campaignId);
+      res.json({ message: "Dice faces cleared successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to clear dice faces" });
+    }
+  });
+
+  // Dice Result routes
+  app.get("/api/dice/results", async (req, res) => {
+    try {
+      const campaignId = req.query.campaignId as string | undefined;
+      const results = await storage.getDiceResults(campaignId);
+      res.json(results);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch dice results" });
+    }
+  });
+
+  app.post("/api/dice/results", async (req, res) => {
+    try {
+      const validatedData = insertDiceResultSchema.parse(req.body);
+      const result = await storage.createDiceResult(validatedData);
+      res.json(result);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid dice result data" });
+    }
+  });
+
+  app.delete("/api/dice/results", async (req, res) => {
+    try {
+      const campaignId = req.query.campaignId as string | undefined;
+      await storage.clearDiceResults(campaignId);
+      res.json({ message: "Dice results cleared successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to clear dice results" });
+    }
+  });
+
+  // Dice Roll endpoint
+  app.post("/api/dice/roll", async (req, res) => {
+    try {
+      // Get active dice campaign
+      const activeCampaign = await storage.getActiveDiceCampaign();
+      if (!activeCampaign) {
+        return res.status(404).json({ message: "No active dice campaign found" });
+      }
+
+      // Check if campaign has a sequence defined
+      const nextWinner = await storage.getNextDiceWinnerFromSequence(activeCampaign.id);
+      let finalFaceNumber: number;
+      let finalFace: any;
+
+      if (nextWinner) {
+        // Use predetermined winner from sequence
+        finalFaceNumber = nextWinner.faceNumber;
+        finalFace = nextWinner.face;
+        await storage.advanceDiceSequenceIndex(activeCampaign.id);
+        console.log(`Using predetermined dice winner: ${finalFace.text} on face ${finalFaceNumber}`);
+      } else {
+        // Random selection when no sequence defined
+        const diceFaces = await storage.getDiceFaces(activeCampaign.id);
+        if (diceFaces.length === 0) {
+          return res.status(400).json({ message: "No dice faces configured for active campaign" });
+        }
+        
+        const randomIndex = Math.floor(Math.random() * diceFaces.length);
+        finalFace = diceFaces[randomIndex];
+        finalFaceNumber = finalFace.faceNumber;
+        console.log(`Random dice selection: ${finalFace.text} on face ${finalFaceNumber}`);
+      }
+
+      // Record the result
+      const diceResult = await storage.createDiceResult({
+        campaignId: activeCampaign.id,
+        faceNumber: finalFaceNumber,
+        winner: finalFace.text,
+        amount: finalFace.amount || null,
+      });
+
+      // Generate random rotation for visual effect (independent of actual result)
+      const rotations = Math.floor(Math.random() * 3) + 5; // 5-7 full rotations
+      const totalDegrees = (rotations * 360) + ((finalFaceNumber - 1) * 60);
+
+      res.json({
+        result: diceResult,
+        animation: {
+          faceNumber: finalFaceNumber,
+          totalDegrees,
+          rotations,
+        }
+      });
+    } catch (error) {
+      console.error("Dice roll error:", error);
+      res.status(500).json({ message: "Failed to roll dice" });
     }
   });
 

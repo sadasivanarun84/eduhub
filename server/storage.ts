@@ -1,4 +1,8 @@
-import { type User, type InsertUser, type WheelSection, type InsertWheelSection, type SpinResult, type InsertSpinResult, type Campaign, type InsertCampaign } from "@shared/schema";
+import { 
+  type User, type InsertUser, type WheelSection, type InsertWheelSection, type SpinResult, type InsertSpinResult, 
+  type Campaign, type InsertCampaign, type DiceCampaign, type DiceFace, type DiceResult, 
+  type InsertDiceCampaign, type InsertDiceFace, type InsertDiceResult 
+} from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -31,6 +35,28 @@ export interface IStorage {
   
   // Campaign reset
   resetCampaign(campaignId: string): Promise<Campaign>;
+  
+  // Dice Game Methods
+  getDiceCampaigns(): Promise<DiceCampaign[]>;
+  getDiceCampaign(id: string): Promise<DiceCampaign | undefined>;
+  getActiveDiceCampaign(): Promise<DiceCampaign | undefined>;
+  createDiceCampaign(campaign: InsertDiceCampaign): Promise<DiceCampaign>;
+  updateDiceCampaign(id: string, updates: Partial<DiceCampaign>): Promise<DiceCampaign>;
+  deleteDiceCampaign(id: string): Promise<void>;
+  
+  getDiceFaces(campaignId?: string): Promise<DiceFace[]>;
+  createDiceFace(face: InsertDiceFace): Promise<DiceFace>;
+  updateDiceFace(id: string, updates: Partial<DiceFace>): Promise<DiceFace>;
+  deleteDiceFace(id: string): Promise<void>;
+  clearDiceFaces(campaignId?: string): Promise<void>;
+  
+  getDiceResults(campaignId?: string): Promise<DiceResult[]>;
+  createDiceResult(result: InsertDiceResult): Promise<DiceResult>;
+  clearDiceResults(campaignId?: string): Promise<void>;
+  
+  getNextDiceWinnerFromSequence(campaignId: string): Promise<{ face: DiceFace; faceNumber: number } | null>;
+  advanceDiceSequenceIndex(campaignId: string): Promise<void>;
+  resetDiceCampaign(campaignId: string): Promise<DiceCampaign>;
 }
 
 export class MemStorage implements IStorage {
@@ -38,6 +64,11 @@ export class MemStorage implements IStorage {
   private campaigns: Map<string, Campaign>;
   private wheelSections: Map<string, WheelSection>;
   private spinResults: Map<string, SpinResult>;
+  
+  // Dice Game Storage
+  private diceCampaigns: Map<string, DiceCampaign>;
+  private diceFaces: Map<string, DiceFace>;
+  private diceResults: Map<string, DiceResult>;
 
   constructor() {
     this.users = new Map();
@@ -45,8 +76,14 @@ export class MemStorage implements IStorage {
     this.wheelSections = new Map();
     this.spinResults = new Map();
     
-    // Initialize with default campaign and wheel sections
+    // Dice Game Storage
+    this.diceCampaigns = new Map();
+    this.diceFaces = new Map();
+    this.diceResults = new Map();
+    
+    // Initialize with default data
     this.initializeDefaults();
+    this.initializeDiceDefaults();
   }
 
   private initializeDefaults() {
@@ -67,6 +104,44 @@ export class MemStorage implements IStorage {
     this.campaigns.set(campaignId, defaultCampaign);
 
     // Start with empty wheel - no default sections
+  }
+
+  private initializeDiceDefaults() {
+    // Create default dice campaign
+    const diceCampaignId = randomUUID();
+    const defaultDiceCampaign: DiceCampaign = {
+      id: diceCampaignId,
+      name: "Default Dice Campaign",
+      totalAmount: null,
+      totalWinners: 100,
+      currentSpent: 0,
+      currentWinners: 0,
+      rotationSequence: [],
+      currentSequenceIndex: 0,
+      isActive: true,
+      createdAt: new Date(),
+    };
+    this.diceCampaigns.set(diceCampaignId, defaultDiceCampaign);
+
+    // Create default dice faces with standard colors
+    const defaultColors = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#3b82f6", "#8b5cf6"];
+    const defaultPrizes = ["$10", "$20", "$50", "$100", "$500", "$1000"];
+    
+    for (let i = 1; i <= 6; i++) {
+      const faceId = randomUUID();
+      const diceFace: DiceFace = {
+        id: faceId,
+        campaignId: diceCampaignId,
+        faceNumber: i,
+        text: defaultPrizes[i - 1],
+        color: defaultColors[i - 1],
+        amount: parseInt(defaultPrizes[i - 1].replace('$', '')),
+        maxWins: 0, // No quota by default
+        currentWins: 0,
+        createdAt: new Date(),
+      };
+      this.diceFaces.set(faceId, diceFace);
+    }
   }
 
   // Generate rotation sequence based on wheel sections and their quotas
@@ -446,6 +521,329 @@ export class MemStorage implements IStorage {
     } else {
       this.spinResults.clear();
     }
+  }
+
+  // ===============================
+  // DICE GAME METHODS
+  // ===============================
+
+  // Generate dice rotation sequence based on face quotas
+  private generateDiceRotationSequence(diceFaces: DiceFace[]): number[] {
+    const sequence: number[] = [];
+    
+    // Sort faces by face number (1-6)
+    const sortedFaces = [...diceFaces].sort((a, b) => a.faceNumber - b.faceNumber);
+    
+    // Filter faces that have quotas set
+    const facesWithQuotas = sortedFaces.filter(face => 
+      face.maxWins && face.maxWins > 0
+    );
+    
+    if (facesWithQuotas.length === 0) {
+      return [];
+    }
+    
+    // Create array with face numbers repeated according to their quotas
+    const facePool: number[] = [];
+    facesWithQuotas.forEach(face => {
+      const quota = face.maxWins || 0;
+      for (let i = 0; i < quota; i++) {
+        facePool.push(face.faceNumber);
+      }
+    });
+    
+    // Shuffle the pool to create a random but quota-compliant sequence
+    const shuffled = [...facePool];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    
+    console.log('Generated dice sequence:', shuffled);
+    console.log('Sequence corresponds to faces:', shuffled.map(faceNum => {
+      const face = sortedFaces.find(f => f.faceNumber === faceNum);
+      return face ? `${face.text}(${face.amount || 'no amount'})` : 'invalid';
+    }));
+    
+    return shuffled;
+  }
+
+  // Dice Campaigns
+  async getDiceCampaigns(): Promise<DiceCampaign[]> {
+    return Array.from(this.diceCampaigns.values());
+  }
+
+  async getDiceCampaign(id: string): Promise<DiceCampaign | undefined> {
+    return this.diceCampaigns.get(id);
+  }
+
+  async getActiveDiceCampaign(): Promise<DiceCampaign | undefined> {
+    return Array.from(this.diceCampaigns.values()).find(campaign => campaign.isActive);
+  }
+
+  async createDiceCampaign(campaign: InsertDiceCampaign): Promise<DiceCampaign> {
+    const id = randomUUID();
+    const newCampaign: DiceCampaign = {
+      id,
+      ...campaign,
+      currentSpent: 0,
+      currentWinners: 0,
+      rotationSequence: [],
+      currentSequenceIndex: 0,
+      isActive: true,
+      createdAt: new Date(),
+    };
+
+    // Deactivate other campaigns
+    for (const existingCampaign of this.diceCampaigns.values()) {
+      existingCampaign.isActive = false;
+    }
+
+    this.diceCampaigns.set(id, newCampaign);
+    return newCampaign;
+  }
+
+  async updateDiceCampaign(id: string, updates: Partial<DiceCampaign>): Promise<DiceCampaign> {
+    const campaign = this.diceCampaigns.get(id);
+    if (!campaign) {
+      throw new Error("Dice campaign not found");
+    }
+
+    const updatedCampaign = { ...campaign, ...updates };
+    this.diceCampaigns.set(id, updatedCampaign);
+
+    // Regenerate sequence if needed
+    if (updates.name || updates.totalWinners) {
+      const diceFaces = await this.getDiceFaces(id);
+      updatedCampaign.rotationSequence = this.generateDiceRotationSequence(diceFaces);
+      updatedCampaign.currentSequenceIndex = 0;
+      this.diceCampaigns.set(id, updatedCampaign);
+    }
+
+    return updatedCampaign;
+  }
+
+  async deleteDiceCampaign(id: string): Promise<void> {
+    this.diceCampaigns.delete(id);
+    // Also delete associated dice faces and results
+    for (const [faceId, face] of this.diceFaces.entries()) {
+      if (face.campaignId === id) {
+        this.diceFaces.delete(faceId);
+      }
+    }
+    for (const [resultId, result] of this.diceResults.entries()) {
+      if (result.campaignId === id) {
+        this.diceResults.delete(resultId);
+      }
+    }
+  }
+
+  // Dice Faces
+  async getDiceFaces(campaignId?: string): Promise<DiceFace[]> {
+    const faces = Array.from(this.diceFaces.values());
+    if (campaignId) {
+      return faces.filter(face => face.campaignId === campaignId).sort((a, b) => a.faceNumber - b.faceNumber);
+    }
+    return faces.sort((a, b) => a.faceNumber - b.faceNumber);
+  }
+
+  async createDiceFace(face: InsertDiceFace): Promise<DiceFace> {
+    const id = randomUUID();
+    const newFace: DiceFace = {
+      id,
+      ...face,
+      currentWins: 0,
+      createdAt: new Date(),
+    };
+
+    this.diceFaces.set(id, newFace);
+
+    // Regenerate sequence for the campaign
+    if (face.campaignId) {
+      const campaign = this.diceCampaigns.get(face.campaignId);
+      if (campaign) {
+        const diceFaces = await this.getDiceFaces(face.campaignId);
+        campaign.rotationSequence = this.generateDiceRotationSequence(diceFaces);
+        campaign.currentSequenceIndex = 0;
+        this.diceCampaigns.set(face.campaignId, campaign);
+      }
+    }
+
+    return newFace;
+  }
+
+  async updateDiceFace(id: string, updates: Partial<DiceFace>): Promise<DiceFace> {
+    const face = this.diceFaces.get(id);
+    if (!face) {
+      throw new Error("Dice face not found");
+    }
+
+    const updatedFace = { ...face, ...updates };
+    this.diceFaces.set(id, updatedFace);
+
+    // Regenerate sequence for the campaign
+    if (face.campaignId) {
+      const campaign = this.diceCampaigns.get(face.campaignId);
+      if (campaign) {
+        const diceFaces = await this.getDiceFaces(face.campaignId);
+        campaign.rotationSequence = this.generateDiceRotationSequence(diceFaces);
+        campaign.currentSequenceIndex = 0;
+        this.diceCampaigns.set(face.campaignId, campaign);
+      }
+    }
+
+    return updatedFace;
+  }
+
+  async deleteDiceFace(id: string): Promise<void> {
+    const face = this.diceFaces.get(id);
+    if (face) {
+      this.diceFaces.delete(id);
+      
+      // Regenerate sequence for the campaign
+      if (face.campaignId) {
+        const campaign = this.diceCampaigns.get(face.campaignId);
+        if (campaign) {
+          const diceFaces = await this.getDiceFaces(face.campaignId);
+          campaign.rotationSequence = this.generateDiceRotationSequence(diceFaces);
+          campaign.currentSequenceIndex = 0;
+          this.diceCampaigns.set(face.campaignId, campaign);
+        }
+      }
+    }
+  }
+
+  async clearDiceFaces(campaignId?: string): Promise<void> {
+    if (campaignId) {
+      for (const [id, face] of this.diceFaces.entries()) {
+        if (face.campaignId === campaignId) {
+          this.diceFaces.delete(id);
+        }
+      }
+    } else {
+      this.diceFaces.clear();
+    }
+  }
+
+  // Dice Results
+  async getDiceResults(campaignId?: string): Promise<DiceResult[]> {
+    const results = Array.from(this.diceResults.values());
+    if (campaignId) {
+      return results.filter(result => result.campaignId === campaignId).sort((a, b) => 
+        new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime()
+      );
+    }
+    return results.sort((a, b) => 
+      new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime()
+    );
+  }
+
+  async createDiceResult(result: InsertDiceResult): Promise<DiceResult> {
+    const id = randomUUID();
+    const newResult: DiceResult = {
+      id,
+      ...result,
+      timestamp: new Date(),
+    };
+
+    this.diceResults.set(id, newResult);
+
+    // Update campaign counters
+    if (result.campaignId) {
+      const campaign = this.diceCampaigns.get(result.campaignId);
+      if (campaign) {
+        campaign.currentWinners = (campaign.currentWinners || 0) + 1;
+        campaign.currentSpent = (campaign.currentSpent || 0) + (result.amount || 0);
+        this.diceCampaigns.set(result.campaignId, campaign);
+      }
+
+      // Update face win counter
+      const face = Array.from(this.diceFaces.values()).find(f => 
+        f.campaignId === result.campaignId && f.faceNumber === result.faceNumber
+      );
+      if (face) {
+        face.currentWins = (face.currentWins || 0) + 1;
+        this.diceFaces.set(face.id, face);
+      }
+    }
+
+    return newResult;
+  }
+
+  async clearDiceResults(campaignId?: string): Promise<void> {
+    if (campaignId) {
+      for (const [id, result] of this.diceResults.entries()) {
+        if (result.campaignId === campaignId) {
+          this.diceResults.delete(id);
+        }
+      }
+    } else {
+      this.diceResults.clear();
+    }
+  }
+
+  // Dice Sequence Management
+  async getNextDiceWinnerFromSequence(campaignId: string): Promise<{ face: DiceFace; faceNumber: number } | null> {
+    const campaign = this.diceCampaigns.get(campaignId);
+    if (!campaign || !campaign.rotationSequence || campaign.rotationSequence.length === 0) {
+      return null;
+    }
+
+    const currentIndex = campaign.currentSequenceIndex || 0;
+    if (currentIndex >= campaign.rotationSequence.length) {
+      return null; // All prizes have been distributed
+    }
+
+    const faceNumber = campaign.rotationSequence[currentIndex];
+    const diceFaces = await this.getDiceFaces(campaignId);
+    const face = diceFaces.find(f => f.faceNumber === faceNumber);
+
+    if (!face) {
+      await this.advanceDiceSequenceIndex(campaignId);
+      return this.getNextDiceWinnerFromSequence(campaignId);
+    }
+
+    console.log(`Next dice from sequence: ${face.text}(${face.amount || 'no amount'}) on face ${faceNumber}`);
+    return { face, faceNumber };
+  }
+
+  async advanceDiceSequenceIndex(campaignId: string): Promise<void> {
+    const campaign = this.diceCampaigns.get(campaignId);
+    if (!campaign) {
+      throw new Error("Dice campaign not found");
+    }
+
+    campaign.currentSequenceIndex = (campaign.currentSequenceIndex || 0) + 1;
+    this.diceCampaigns.set(campaignId, campaign);
+  }
+
+  async resetDiceCampaign(campaignId: string): Promise<DiceCampaign> {
+    const campaign = this.diceCampaigns.get(campaignId);
+    if (!campaign) {
+      throw new Error("Dice campaign not found");
+    }
+
+    // Reset campaign counters
+    campaign.currentSpent = 0;
+    campaign.currentWinners = 0;
+    campaign.currentSequenceIndex = 0;
+
+    // Clear all dice results for this campaign
+    await this.clearDiceResults(campaignId);
+
+    // Reset face counters and regenerate sequence
+    const diceFaces = await this.getDiceFaces(campaignId);
+    diceFaces.forEach(face => {
+      face.currentWins = 0;
+      this.diceFaces.set(face.id, face);
+    });
+
+    // Regenerate rotation sequence
+    campaign.rotationSequence = this.generateDiceRotationSequence(diceFaces);
+    
+    const updatedCampaign = { ...campaign };
+    this.diceCampaigns.set(campaignId, updatedCampaign);
+    return updatedCampaign;
   }
 }
 
