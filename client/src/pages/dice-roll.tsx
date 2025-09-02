@@ -122,6 +122,7 @@ export function DiceRollPage() {
             <DiceRoll 
               faces={faces} 
               disabled={hasQuotas && remainingQuota <= 0}
+              activeCampaign={activeCampaign}
             />
 
             {/* Warning Message */}
@@ -175,7 +176,7 @@ export function DiceRollPage() {
                       </span>
                       {result.amount && (
                         <span className="text-green-600" data-testid={`text-result-amount-${index}`}>
-                          ${result.amount}
+                          {result.amount}
                         </span>
                       )}
                     </div>

@@ -400,6 +400,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         amount: finalFace.amount || null,
       });
 
+      // Update campaign statistics
+      const currentSpent = (activeCampaign.currentSpent || 0);
+      const currentWinners = (activeCampaign.currentWinners || 0) + 1;
+      await storage.updateDiceCampaign(activeCampaign.id, {
+        currentWinners,
+        currentSpent, // Keep current spent as is since amount can be text
+      });
+
+      // Update face statistics
+      await storage.updateDiceFace(finalFace.id, {
+        currentWins: (finalFace.currentWins || 0) + 1,
+      });
+
       // Generate random rotation for visual effect (independent of actual result)
       const rotations = Math.floor(Math.random() * 3) + 5; // 5-7 full rotations
       const totalDegrees = (rotations * 360) + ((finalFaceNumber - 1) * 60);

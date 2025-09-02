@@ -135,7 +135,7 @@ export class MemStorage implements IStorage {
         faceNumber: i,
         text: defaultPrizes[i - 1],
         color: defaultColors[i - 1],
-        amount: parseInt(defaultPrizes[i - 1].replace('$', '')),
+        amount: defaultPrizes[i - 1],
         maxWins: 0, // No quota by default
         currentWins: 0,
         createdAt: new Date(),
@@ -753,7 +753,7 @@ export class MemStorage implements IStorage {
       const campaign = this.diceCampaigns.get(result.campaignId);
       if (campaign) {
         campaign.currentWinners = (campaign.currentWinners || 0) + 1;
-        campaign.currentSpent = (campaign.currentSpent || 0) + (result.amount || 0);
+        // Note: currentSpent not auto-calculated since amount can be text
         this.diceCampaigns.set(result.campaignId, campaign);
       }
 

@@ -8,6 +8,7 @@ import type { DiceResult, DiceFace } from "@shared/schema";
 interface DiceRollProps {
   faces: DiceFace[];
   disabled?: boolean;
+  activeCampaign?: { id: string } | null;
 }
 
 interface RollResponse {
@@ -19,7 +20,7 @@ interface RollResponse {
   };
 }
 
-export function DiceRoll({ faces, disabled }: DiceRollProps) {
+export function DiceRoll({ faces, disabled, activeCampaign }: DiceRollProps) {
   const [isRolling, setIsRolling] = useState(false);
   const [lastResult, setLastResult] = useState<DiceResult | null>(null);
   const diceRef = useRef<HTMLDivElement>(null);
@@ -39,10 +40,10 @@ export function DiceRoll({ faces, disabled }: DiceRollProps) {
       animateDice(data.animation.faceNumber, data.animation.totalDegrees);
       setLastResult(data.result);
       
-      // Invalidate relevant queries
-      queryClient.invalidateQueries({ queryKey: ["/api/dice/results"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dice/campaigns"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dice/faces"] });
+      // Invalidate relevant queries to refresh UI
+      queryClient.invalidateQueries({ queryKey: ["/api/dice/campaigns/active"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/dice/results?campaignId=${activeCampaign?.id}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/dice/faces?campaignId=${activeCampaign?.id}`] });
     },
     onError: (error) => {
       console.error("Roll failed:", error);
