@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ interface ThreeDiceRollProps {
 
 export function ThreeDiceRoll({ faces, disabled, activeCampaign }: ThreeDiceRollProps) {
   const [isRolling, setIsRolling] = useState(false);
+  const rollInProgressRef = useRef(false);
   const dice1Ref = useRef<HTMLDivElement>(null);
   const dice2Ref = useRef<HTMLDivElement>(null);
   const dice3Ref = useRef<HTMLDivElement>(null);
@@ -39,6 +40,7 @@ export function ThreeDiceRoll({ faces, disabled, activeCampaign }: ThreeDiceRoll
     onSuccess: (data) => {
       // Start rolling animation for all three dice
       setIsRolling(true);
+      rollInProgressRef.current = true;
       
       // Generate random tumbling animation for each dice
       const generateTumbleAnimation = (finalFace: number) => {
@@ -96,6 +98,7 @@ export function ThreeDiceRoll({ faces, disabled, activeCampaign }: ThreeDiceRoll
       // Stop rolling and show results after dice settle
       setTimeout(() => {
         setIsRolling(false);
+        rollInProgressRef.current = false;
         
         // Invalidate and refetch queries
         queryClient.invalidateQueries({ queryKey: [`/api/three-dice/results?campaignId=${activeCampaign?.id}`] });
@@ -113,6 +116,7 @@ export function ThreeDiceRoll({ faces, disabled, activeCampaign }: ThreeDiceRoll
     },
     onError: () => {
       setIsRolling(false);
+      rollInProgressRef.current = false;
       toast({
         title: "Failed to roll three dice",
         description: "Please try again.",
@@ -121,8 +125,15 @@ export function ThreeDiceRoll({ faces, disabled, activeCampaign }: ThreeDiceRoll
     },
   });
 
-  const handleRoll = () => {
-    if (isRolling || disabled || rollMutation.isPending) return;
+  const handleRoll = useCallback(() => {
+    // Prevent multiple concurrent rolls with multiple checks
+    if (isRolling || disabled || rollMutation.isPending || rollInProgressRef.current) {
+      console.log("Roll blocked:", { isRolling, disabled, isPending: rollMutation.isPending, inProgress: rollInProgressRef.current });
+      return;
+    }
+    
+    console.log("Starting roll...");
+    rollInProgressRef.current = true;
     
     // Reset dice to neutral position before rolling
     if (dice1Ref.current) {
@@ -137,7 +148,7 @@ export function ThreeDiceRoll({ faces, disabled, activeCampaign }: ThreeDiceRoll
     
     // Start rolling immediately
     rollMutation.mutate();
-  };
+  }, [isRolling, disabled, rollMutation]);
 
   const getFaceData = (diceNumber: number, faceNumber: number) => {
     return faces.find(f => f.diceNumber === diceNumber && f.faceNumber === faceNumber) || { 
