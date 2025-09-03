@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertWheelSectionSchema, insertSpinResultSchema, insertCampaignSchema, insertDiceCampaignSchema, insertDiceFaceSchema, insertDiceResultSchema } from "@shared/schema";
+import { insertWheelSectionSchema, insertSpinResultSchema, insertCampaignSchema, insertDiceCampaignSchema, insertDiceFaceSchema, insertDiceResultSchema, insertThreeDiceCampaignSchema, insertThreeDiceFaceSchema, insertThreeDiceResultSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Campaign routes
@@ -428,6 +428,252 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Dice roll error:", error);
       res.status(500).json({ message: "Failed to roll dice" });
+    }
+  });
+
+  // ===============================
+  // THREE DICE GAME ROUTES
+  // ===============================
+
+  // Three Dice Campaign routes
+  app.get("/api/three-dice/campaigns", async (req, res) => {
+    try {
+      const campaigns = await storage.getThreeDiceCampaigns();
+      res.json(campaigns);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch three dice campaigns" });
+    }
+  });
+
+  app.get("/api/three-dice/campaigns/active", async (req, res) => {
+    try {
+      const activeCampaign = await storage.getActiveThreeDiceCampaign();
+      if (!activeCampaign) {
+        return res.status(404).json({ message: "No active three dice campaign found" });
+      }
+      res.json(activeCampaign);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch active three dice campaign" });
+    }
+  });
+
+  app.get("/api/three-dice/campaigns/:id", async (req, res) => {
+    try {
+      const campaign = await storage.getThreeDiceCampaign(req.params.id);
+      if (!campaign) {
+        return res.status(404).json({ message: "Three dice campaign not found" });
+      }
+      res.json(campaign);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch three dice campaign" });
+    }
+  });
+
+  app.post("/api/three-dice/campaigns", async (req, res) => {
+    try {
+      const validatedData = insertThreeDiceCampaignSchema.parse(req.body);
+      const campaign = await storage.createThreeDiceCampaign(validatedData);
+      res.json(campaign);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid three dice campaign data" });
+    }
+  });
+
+  app.put("/api/three-dice/campaigns/:id", async (req, res) => {
+    try {
+      const updates = req.body;
+      const campaign = await storage.updateThreeDiceCampaign(req.params.id, updates);
+      res.json(campaign);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update three dice campaign" });
+    }
+  });
+
+  app.delete("/api/three-dice/campaigns/:id", async (req, res) => {
+    try {
+      await storage.deleteThreeDiceCampaign(req.params.id);
+      res.json({ message: "Three dice campaign deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete three dice campaign" });
+    }
+  });
+
+  app.post("/api/three-dice/campaigns/:id/reset", async (req, res) => {
+    try {
+      const resetCampaign = await storage.resetThreeDiceCampaign(req.params.id);
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
+      res.json(resetCampaign);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to reset three dice campaign" });
+    }
+  });
+
+  // Three Dice Face routes
+  app.get("/api/three-dice/faces", async (req, res) => {
+    try {
+      const campaignId = req.query.campaignId as string | undefined;
+      const faces = await storage.getThreeDiceFaces(campaignId);
+      res.json(faces);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch three dice faces" });
+    }
+  });
+
+  app.post("/api/three-dice/faces", async (req, res) => {
+    try {
+      const validatedData = insertThreeDiceFaceSchema.parse(req.body);
+      const face = await storage.createThreeDiceFace(validatedData);
+      res.json(face);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid three dice face data" });
+    }
+  });
+
+  app.put("/api/three-dice/faces/:id", async (req, res) => {
+    try {
+      const updates = req.body;
+      const face = await storage.updateThreeDiceFace(req.params.id, updates);
+      res.json(face);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update three dice face" });
+    }
+  });
+
+  app.delete("/api/three-dice/faces/:id", async (req, res) => {
+    try {
+      await storage.deleteThreeDiceFace(req.params.id);
+      res.json({ message: "Three dice face deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete three dice face" });
+    }
+  });
+
+  app.delete("/api/three-dice/faces", async (req, res) => {
+    try {
+      const campaignId = req.query.campaignId as string | undefined;
+      await storage.clearThreeDiceFaces(campaignId);
+      res.json({ message: "Three dice faces cleared successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to clear three dice faces" });
+    }
+  });
+
+  // Three Dice Result routes
+  app.get("/api/three-dice/results", async (req, res) => {
+    try {
+      const campaignId = req.query.campaignId as string | undefined;
+      const results = await storage.getThreeDiceResults(campaignId);
+      res.json(results);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch three dice results" });
+    }
+  });
+
+  app.post("/api/three-dice/results", async (req, res) => {
+    try {
+      const validatedData = insertThreeDiceResultSchema.parse(req.body);
+      const result = await storage.createThreeDiceResult(validatedData);
+      res.json(result);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid three dice result data" });
+    }
+  });
+
+  app.delete("/api/three-dice/results", async (req, res) => {
+    try {
+      const campaignId = req.query.campaignId as string | undefined;
+      await storage.clearThreeDiceResults(campaignId);
+      res.json({ message: "Three dice results cleared successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to clear three dice results" });
+    }
+  });
+
+  // Three Dice Roll endpoint
+  app.post("/api/three-dice/roll", async (req, res) => {
+    try {
+      // Get active three dice campaign
+      const activeCampaign = await storage.getActiveThreeDiceCampaign();
+      if (!activeCampaign) {
+        return res.status(404).json({ message: "No active three dice campaign found" });
+      }
+
+      // Get all faces for this campaign
+      const threeDiceFaces = await storage.getThreeDiceFaces(activeCampaign.id);
+      if (threeDiceFaces.length === 0) {
+        return res.status(400).json({ message: "No three dice faces configured for active campaign" });
+      }
+
+      // Group faces by dice number
+      const dice1Faces = threeDiceFaces.filter(f => f.diceNumber === 1);
+      const dice2Faces = threeDiceFaces.filter(f => f.diceNumber === 2);
+      const dice3Faces = threeDiceFaces.filter(f => f.diceNumber === 3);
+
+      if (dice1Faces.length === 0 || dice2Faces.length === 0 || dice3Faces.length === 0) {
+        return res.status(400).json({ message: "All three dice must have configured faces" });
+      }
+
+      // Randomly select a face for each dice
+      const dice1Result = dice1Faces[Math.floor(Math.random() * dice1Faces.length)];
+      const dice2Result = dice2Faces[Math.floor(Math.random() * dice2Faces.length)];
+      const dice3Result = dice3Faces[Math.floor(Math.random() * dice3Faces.length)];
+
+      console.log(`Three dice roll: Dice 1 - ${dice1Result.text} (Face ${dice1Result.faceNumber}), Dice 2 - ${dice2Result.text} (Face ${dice2Result.faceNumber}), Dice 3 - ${dice3Result.text} (Face ${dice3Result.faceNumber})`);
+
+      // Record the result
+      const threeDiceResult = await storage.createThreeDiceResult({
+        campaignId: activeCampaign.id,
+        dice1Face: dice1Result.faceNumber,
+        dice2Face: dice2Result.faceNumber,
+        dice3Face: dice3Result.faceNumber,
+        winner1: dice1Result.text,
+        winner2: dice2Result.text,
+        winner3: dice3Result.text,
+        amount1: dice1Result.amount || null,
+        amount2: dice2Result.amount || null,
+        amount3: dice3Result.amount || null,
+      });
+
+      // Update campaign statistics
+      const currentWinners = (activeCampaign.currentWinners || 0) + 1;
+      await storage.updateThreeDiceCampaign(activeCampaign.id, {
+        currentWinners,
+      });
+
+      // Generate random rotation for visual effect for each dice
+      const dice1Rotations = Math.floor(Math.random() * 3) + 5; // 5-7 full rotations
+      const dice2Rotations = Math.floor(Math.random() * 3) + 5;
+      const dice3Rotations = Math.floor(Math.random() * 3) + 5;
+
+      const dice1TotalDegrees = (dice1Rotations * 360) + ((dice1Result.faceNumber - 1) * 60);
+      const dice2TotalDegrees = (dice2Rotations * 360) + ((dice2Result.faceNumber - 1) * 60);
+      const dice3TotalDegrees = (dice3Rotations * 360) + ((dice3Result.faceNumber - 1) * 60);
+
+      res.json({
+        result: threeDiceResult,
+        animation: {
+          dice1: {
+            faceNumber: dice1Result.faceNumber,
+            totalDegrees: dice1TotalDegrees,
+            rotations: dice1Rotations,
+          },
+          dice2: {
+            faceNumber: dice2Result.faceNumber,
+            totalDegrees: dice2TotalDegrees,
+            rotations: dice2Rotations,
+          },
+          dice3: {
+            faceNumber: dice3Result.faceNumber,
+            totalDegrees: dice3TotalDegrees,
+            rotations: dice3Rotations,
+          },
+        }
+      });
+    } catch (error) {
+      console.error("Three dice roll error:", error);
+      res.status(500).json({ message: "Failed to roll three dice" });
     }
   });
 

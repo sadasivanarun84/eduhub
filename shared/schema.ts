@@ -72,6 +72,47 @@ export const diceResults = pgTable("dice_results", {
   timestamp: timestamp("timestamp").defaultNow(),
 });
 
+// Three Dice Game Models
+export const threeDiceCampaigns = pgTable("three_dice_campaigns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  totalAmount: integer("total_amount"),
+  totalWinners: integer("total_winners").notNull(),
+  currentSpent: integer("current_spent").default(0),
+  currentWinners: integer("current_winners").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const threeDiceFaces = pgTable("three_dice_faces", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => threeDiceCampaigns.id),
+  diceNumber: integer("dice_number").notNull(), // 1, 2, or 3 (which dice)
+  faceNumber: integer("face_number").notNull(), // 1-6 (which face on the dice)
+  text: text("text").notNull(),
+  color: text("color").notNull(),
+  textColor: text("text_color").notNull().default("#000000"), // Text color
+  amount: text("amount"), // Prize value (can be money or items)
+  maxWins: integer("max_wins").default(0), // Maximum times this prize can be won
+  currentWins: integer("current_wins").default(0), // Current times this prize has been won
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const threeDiceResults = pgTable("three_dice_results", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => threeDiceCampaigns.id),
+  dice1Face: integer("dice1_face").notNull(), // Face rolled on dice 1 (1-6)
+  dice2Face: integer("dice2_face").notNull(), // Face rolled on dice 2 (1-6)
+  dice3Face: integer("dice3_face").notNull(), // Face rolled on dice 3 (1-6)
+  winner1: text("winner1").notNull(), // Prize from dice 1
+  winner2: text("winner2").notNull(), // Prize from dice 2
+  winner3: text("winner3").notNull(), // Prize from dice 3
+  amount1: text("amount1"), // Prize value from dice 1
+  amount2: text("amount2"), // Prize value from dice 2
+  amount3: text("amount3"), // Prize value from dice 3
+  timestamp: timestamp("timestamp").defaultNow(),
+});
+
 export const insertCampaignSchema = createInsertSchema(campaigns).pick({
   name: true,
   totalAmount: true,
@@ -117,6 +158,37 @@ export const insertDiceResultSchema = createInsertSchema(diceResults).pick({
   amount: true,
 });
 
+// Three Dice Game Schemas
+export const insertThreeDiceCampaignSchema = createInsertSchema(threeDiceCampaigns).pick({
+  name: true,
+  totalAmount: true,
+  totalWinners: true,
+});
+
+export const insertThreeDiceFaceSchema = createInsertSchema(threeDiceFaces).pick({
+  campaignId: true,
+  diceNumber: true,
+  faceNumber: true,
+  text: true,
+  color: true,
+  textColor: true,
+  amount: true,
+  maxWins: true,
+});
+
+export const insertThreeDiceResultSchema = createInsertSchema(threeDiceResults).pick({
+  campaignId: true,
+  dice1Face: true,
+  dice2Face: true,
+  dice3Face: true,
+  winner1: true,
+  winner2: true,
+  winner3: true,
+  amount1: true,
+  amount2: true,
+  amount3: true,
+});
+
 // Spinning Wheel Types
 export type InsertCampaign = z.infer<typeof insertCampaignSchema>;
 export type Campaign = typeof campaigns.$inferSelect;
@@ -132,6 +204,14 @@ export type InsertDiceFace = z.infer<typeof insertDiceFaceSchema>;
 export type DiceFace = typeof diceFaces.$inferSelect;
 export type InsertDiceResult = z.infer<typeof insertDiceResultSchema>;
 export type DiceResult = typeof diceResults.$inferSelect;
+
+// Three Dice Game Types
+export type InsertThreeDiceCampaign = z.infer<typeof insertThreeDiceCampaignSchema>;
+export type ThreeDiceCampaign = typeof threeDiceCampaigns.$inferSelect;
+export type InsertThreeDiceFace = z.infer<typeof insertThreeDiceFaceSchema>;
+export type ThreeDiceFace = typeof threeDiceFaces.$inferSelect;
+export type InsertThreeDiceResult = z.infer<typeof insertThreeDiceResultSchema>;
+export type ThreeDiceResult = typeof threeDiceResults.$inferSelect;
 
 // Keep existing user schema
 export const users = pgTable("users", {

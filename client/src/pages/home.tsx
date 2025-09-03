@@ -21,6 +21,14 @@ export default function HomePage() {
       features: ["6 configurable faces", "Quota-based system", "3D animations", "Prize tracking"],
       status: "Available"
     },
+    {
+      id: "threediceroll",
+      title: "🎲🎲🎲 Three Dice Roll",
+      description: "Roll three customizable dice simultaneously with independent face configuration. Perfect for complex prize combinations and multi-tier rewards.",
+      path: "/threediceroll",
+      features: ["3 independent dice", "18 configurable faces", "Separate dice quotas", "Combo rewards"],
+      status: "Available"
+    },
     // Future games will be added here
   ];
 

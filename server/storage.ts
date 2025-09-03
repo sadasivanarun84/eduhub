@@ -1,7 +1,9 @@
 import { 
   type User, type InsertUser, type WheelSection, type InsertWheelSection, type SpinResult, type InsertSpinResult, 
   type Campaign, type InsertCampaign, type DiceCampaign, type DiceFace, type DiceResult, 
-  type InsertDiceCampaign, type InsertDiceFace, type InsertDiceResult 
+  type InsertDiceCampaign, type InsertDiceFace, type InsertDiceResult,
+  type ThreeDiceCampaign, type ThreeDiceFace, type ThreeDiceResult,
+  type InsertThreeDiceCampaign, type InsertThreeDiceFace, type InsertThreeDiceResult 
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -57,6 +59,26 @@ export interface IStorage {
   getNextDiceWinnerFromSequence(campaignId: string): Promise<{ face: DiceFace; faceNumber: number } | null>;
   advanceDiceSequenceIndex(campaignId: string): Promise<void>;
   resetDiceCampaign(campaignId: string): Promise<DiceCampaign>;
+  
+  // Three Dice Game Methods
+  getThreeDiceCampaigns(): Promise<ThreeDiceCampaign[]>;
+  getThreeDiceCampaign(id: string): Promise<ThreeDiceCampaign | undefined>;
+  getActiveThreeDiceCampaign(): Promise<ThreeDiceCampaign | undefined>;
+  createThreeDiceCampaign(campaign: InsertThreeDiceCampaign): Promise<ThreeDiceCampaign>;
+  updateThreeDiceCampaign(id: string, updates: Partial<ThreeDiceCampaign>): Promise<ThreeDiceCampaign>;
+  deleteThreeDiceCampaign(id: string): Promise<void>;
+  
+  getThreeDiceFaces(campaignId?: string): Promise<ThreeDiceFace[]>;
+  createThreeDiceFace(face: InsertThreeDiceFace): Promise<ThreeDiceFace>;
+  updateThreeDiceFace(id: string, updates: Partial<ThreeDiceFace>): Promise<ThreeDiceFace>;
+  deleteThreeDiceFace(id: string): Promise<void>;
+  clearThreeDiceFaces(campaignId?: string): Promise<void>;
+  
+  getThreeDiceResults(campaignId?: string): Promise<ThreeDiceResult[]>;
+  createThreeDiceResult(result: InsertThreeDiceResult): Promise<ThreeDiceResult>;
+  clearThreeDiceResults(campaignId?: string): Promise<void>;
+  
+  resetThreeDiceCampaign(campaignId: string): Promise<ThreeDiceCampaign>;
 }
 
 export class MemStorage implements IStorage {
@@ -69,6 +91,11 @@ export class MemStorage implements IStorage {
   private diceCampaigns: Map<string, DiceCampaign>;
   private diceFaces: Map<string, DiceFace>;
   private diceResults: Map<string, DiceResult>;
+  
+  // Three Dice Game Storage
+  private threeDiceCampaigns: Map<string, ThreeDiceCampaign>;
+  private threeDiceFaces: Map<string, ThreeDiceFace>;
+  private threeDiceResults: Map<string, ThreeDiceResult>;
 
   constructor() {
     this.users = new Map();
@@ -81,9 +108,15 @@ export class MemStorage implements IStorage {
     this.diceFaces = new Map();
     this.diceResults = new Map();
     
+    // Three Dice Game Storage
+    this.threeDiceCampaigns = new Map();
+    this.threeDiceFaces = new Map();
+    this.threeDiceResults = new Map();
+    
     // Initialize with default data
     this.initializeDefaults();
     this.initializeDiceDefaults();
+    this.initializeThreeDiceDefaults();
   }
 
   private initializeDefaults() {
@@ -845,6 +878,252 @@ export class MemStorage implements IStorage {
     
     const updatedCampaign = { ...campaign };
     this.diceCampaigns.set(campaignId, updatedCampaign);
+    return updatedCampaign;
+  }
+
+  // ===============================
+  // THREE DICE GAME METHODS
+  // ===============================
+
+  private initializeThreeDiceDefaults() {
+    // Create default three dice campaign
+    const threeDiceCampaignId = randomUUID();
+    const defaultThreeDiceCampaign: ThreeDiceCampaign = {
+      id: threeDiceCampaignId,
+      name: "Default Three Dice Campaign",
+      totalAmount: null,
+      totalWinners: 100,
+      currentSpent: 0,
+      currentWinners: 0,
+      isActive: true,
+      createdAt: new Date(),
+    };
+    this.threeDiceCampaigns.set(threeDiceCampaignId, defaultThreeDiceCampaign);
+
+    // Create default faces for each of the 3 dice with white background and black text
+    const defaultColors = ["#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff"];
+    const defaultTextColors = ["#000000", "#000000", "#000000", "#000000", "#000000", "#000000"];
+    const defaultPrizes = ["$10", "$20", "$50", "$100", "$500", "$1000"];
+    
+    // Create faces for each of the 3 dice
+    for (let diceNum = 1; diceNum <= 3; diceNum++) {
+      for (let faceNum = 1; faceNum <= 6; faceNum++) {
+        const faceId = randomUUID();
+        const threeDiceFace: ThreeDiceFace = {
+          id: faceId,
+          campaignId: threeDiceCampaignId,
+          diceNumber: diceNum,
+          faceNumber: faceNum,
+          text: defaultPrizes[faceNum - 1],
+          color: defaultColors[faceNum - 1],
+          textColor: defaultTextColors[faceNum - 1],
+          amount: defaultPrizes[faceNum - 1],
+          maxWins: 0, // No quota by default
+          currentWins: 0,
+          createdAt: new Date(),
+        };
+        this.threeDiceFaces.set(faceId, threeDiceFace);
+      }
+    }
+  }
+
+  // Three Dice Campaigns
+  async getThreeDiceCampaigns(): Promise<ThreeDiceCampaign[]> {
+    return Array.from(this.threeDiceCampaigns.values());
+  }
+
+  async getThreeDiceCampaign(id: string): Promise<ThreeDiceCampaign | undefined> {
+    return this.threeDiceCampaigns.get(id);
+  }
+
+  async getActiveThreeDiceCampaign(): Promise<ThreeDiceCampaign | undefined> {
+    return Array.from(this.threeDiceCampaigns.values()).find(campaign => campaign.isActive);
+  }
+
+  async createThreeDiceCampaign(campaign: InsertThreeDiceCampaign): Promise<ThreeDiceCampaign> {
+    const id = randomUUID();
+    const newCampaign: ThreeDiceCampaign = {
+      id,
+      ...campaign,
+      currentSpent: 0,
+      currentWinners: 0,
+      isActive: true,
+      createdAt: new Date(),
+    };
+
+    // Deactivate other campaigns
+    for (const existingCampaign of this.threeDiceCampaigns.values()) {
+      existingCampaign.isActive = false;
+    }
+
+    this.threeDiceCampaigns.set(id, newCampaign);
+    return newCampaign;
+  }
+
+  async updateThreeDiceCampaign(id: string, updates: Partial<ThreeDiceCampaign>): Promise<ThreeDiceCampaign> {
+    const campaign = this.threeDiceCampaigns.get(id);
+    if (!campaign) {
+      throw new Error("Three dice campaign not found");
+    }
+
+    const updatedCampaign = { ...campaign, ...updates };
+    this.threeDiceCampaigns.set(id, updatedCampaign);
+
+    return updatedCampaign;
+  }
+
+  async deleteThreeDiceCampaign(id: string): Promise<void> {
+    this.threeDiceCampaigns.delete(id);
+    // Also delete associated three dice faces and results
+    for (const [faceId, face] of this.threeDiceFaces.entries()) {
+      if (face.campaignId === id) {
+        this.threeDiceFaces.delete(faceId);
+      }
+    }
+    for (const [resultId, result] of this.threeDiceResults.entries()) {
+      if (result.campaignId === id) {
+        this.threeDiceResults.delete(resultId);
+      }
+    }
+  }
+
+  // Three Dice Faces
+  async getThreeDiceFaces(campaignId?: string): Promise<ThreeDiceFace[]> {
+    const faces = Array.from(this.threeDiceFaces.values());
+    if (campaignId) {
+      return faces.filter(face => face.campaignId === campaignId)
+        .sort((a, b) => a.diceNumber - b.diceNumber || a.faceNumber - b.faceNumber);
+    }
+    return faces.sort((a, b) => a.diceNumber - b.diceNumber || a.faceNumber - b.faceNumber);
+  }
+
+  async createThreeDiceFace(face: InsertThreeDiceFace): Promise<ThreeDiceFace> {
+    const id = randomUUID();
+    const newFace: ThreeDiceFace = {
+      id,
+      ...face,
+      currentWins: 0,
+      createdAt: new Date(),
+    };
+
+    this.threeDiceFaces.set(id, newFace);
+    return newFace;
+  }
+
+  async updateThreeDiceFace(id: string, updates: Partial<ThreeDiceFace>): Promise<ThreeDiceFace> {
+    const face = this.threeDiceFaces.get(id);
+    if (!face) {
+      throw new Error("Three dice face not found");
+    }
+
+    const updatedFace = { ...face, ...updates };
+    this.threeDiceFaces.set(id, updatedFace);
+    return updatedFace;
+  }
+
+  async deleteThreeDiceFace(id: string): Promise<void> {
+    this.threeDiceFaces.delete(id);
+  }
+
+  async clearThreeDiceFaces(campaignId?: string): Promise<void> {
+    if (campaignId) {
+      for (const [id, face] of this.threeDiceFaces.entries()) {
+        if (face.campaignId === campaignId) {
+          this.threeDiceFaces.delete(id);
+        }
+      }
+    } else {
+      this.threeDiceFaces.clear();
+    }
+  }
+
+  // Three Dice Results
+  async getThreeDiceResults(campaignId?: string): Promise<ThreeDiceResult[]> {
+    const results = Array.from(this.threeDiceResults.values());
+    if (campaignId) {
+      return results.filter(result => result.campaignId === campaignId)
+        .sort((a, b) => (b.timestamp?.getTime() || 0) - (a.timestamp?.getTime() || 0));
+    }
+    return results.sort((a, b) => (b.timestamp?.getTime() || 0) - (a.timestamp?.getTime() || 0));
+  }
+
+  async createThreeDiceResult(result: InsertThreeDiceResult): Promise<ThreeDiceResult> {
+    const id = randomUUID();
+    const newResult: ThreeDiceResult = {
+      id,
+      ...result,
+      timestamp: new Date(),
+    };
+
+    this.threeDiceResults.set(id, newResult);
+
+    // Update campaign counters
+    if (result.campaignId) {
+      const campaign = this.threeDiceCampaigns.get(result.campaignId);
+      if (campaign) {
+        campaign.currentWinners = (campaign.currentWinners || 0) + 1;
+        this.threeDiceCampaigns.set(result.campaignId, campaign);
+      }
+
+      // Update face win counters for all three dice
+      const faces = Array.from(this.threeDiceFaces.values()).filter(f => f.campaignId === result.campaignId);
+      
+      const dice1Face = faces.find(f => f.diceNumber === 1 && f.faceNumber === result.dice1Face);
+      if (dice1Face) {
+        dice1Face.currentWins = (dice1Face.currentWins || 0) + 1;
+        this.threeDiceFaces.set(dice1Face.id, dice1Face);
+      }
+      
+      const dice2Face = faces.find(f => f.diceNumber === 2 && f.faceNumber === result.dice2Face);
+      if (dice2Face) {
+        dice2Face.currentWins = (dice2Face.currentWins || 0) + 1;
+        this.threeDiceFaces.set(dice2Face.id, dice2Face);
+      }
+      
+      const dice3Face = faces.find(f => f.diceNumber === 3 && f.faceNumber === result.dice3Face);
+      if (dice3Face) {
+        dice3Face.currentWins = (dice3Face.currentWins || 0) + 1;
+        this.threeDiceFaces.set(dice3Face.id, dice3Face);
+      }
+    }
+
+    return newResult;
+  }
+
+  async clearThreeDiceResults(campaignId?: string): Promise<void> {
+    if (campaignId) {
+      for (const [id, result] of this.threeDiceResults.entries()) {
+        if (result.campaignId === campaignId) {
+          this.threeDiceResults.delete(id);
+        }
+      }
+    } else {
+      this.threeDiceResults.clear();
+    }
+  }
+
+  async resetThreeDiceCampaign(campaignId: string): Promise<ThreeDiceCampaign> {
+    const campaign = this.threeDiceCampaigns.get(campaignId);
+    if (!campaign) {
+      throw new Error("Three dice campaign not found");
+    }
+
+    // Reset campaign counters
+    campaign.currentSpent = 0;
+    campaign.currentWinners = 0;
+
+    // Clear all three dice results for this campaign
+    await this.clearThreeDiceResults(campaignId);
+
+    // Reset face counters
+    const threeDiceFaces = await this.getThreeDiceFaces(campaignId);
+    threeDiceFaces.forEach(face => {
+      face.currentWins = 0;
+      this.threeDiceFaces.set(face.id, face);
+    });
+    
+    const updatedCampaign = { ...campaign };
+    this.threeDiceCampaigns.set(campaignId, updatedCampaign);
     return updatedCampaign;
   }
 }

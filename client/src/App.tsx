@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import HomePage from "@/pages/home";
 import SpinWheelPage from "@/pages/spin-wheel";
 import { DiceRollPage } from "@/pages/dice-roll";
+import { ThreeDiceRollPage } from "@/pages/three-dice-roll";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -14,6 +15,7 @@ function Router() {
       <Route path="/" component={HomePage} />
       <Route path="/spinwheel" component={SpinWheelPage} />
       <Route path="/diceroll" component={DiceRollPage} />
+      <Route path="/threediceroll" component={ThreeDiceRollPage} />
       <Route component={NotFound} />
     </Switch>
   );
