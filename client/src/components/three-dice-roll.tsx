@@ -40,16 +40,58 @@ export function ThreeDiceRoll({ faces, disabled, activeCampaign }: ThreeDiceRoll
       // Start rolling animation for all three dice
       setIsRolling(true);
       
-      // Apply rotation animations
+      // Generate random tumbling animation for each dice
+      const generateTumbleAnimation = (finalFace: number) => {
+        const rotations = Math.floor(Math.random() * 3) + 5; // 5-7 full rotations
+        const randomX = Math.random() * 360 * rotations;
+        const randomY = Math.random() * 360 * rotations;
+        const randomZ = Math.random() * 360 * rotations;
+        
+        // Calculate final position based on face number
+        const faceRotations = {
+          1: { x: 0, y: 0, z: 0 },     // Front
+          2: { x: 0, y: 90, z: 0 },    // Right  
+          3: { x: -90, y: 0, z: 0 },   // Top
+          4: { x: 90, y: 0, z: 0 },    // Bottom
+          5: { x: 0, y: -90, z: 0 },   // Left
+          6: { x: 0, y: 180, z: 0 },   // Back
+        };
+        
+        const finalRotation = faceRotations[finalFace as keyof typeof faceRotations];
+        
+        return {
+          intermediate: `rotateX(${randomX}deg) rotateY(${randomY}deg) rotateZ(${randomZ}deg)`,
+          final: `rotateX(${finalRotation.x}deg) rotateY(${finalRotation.y}deg) rotateZ(${finalRotation.z}deg)`,
+        };
+      };
+
+      const dice1Animation = generateTumbleAnimation(data.result.dice1Face);
+      const dice2Animation = generateTumbleAnimation(data.result.dice2Face);
+      const dice3Animation = generateTumbleAnimation(data.result.dice3Face);
+
+      // Apply tumbling animations
       if (dice1Ref.current) {
-        dice1Ref.current.style.transform = `rotateX(${data.animation.dice1.totalDegrees}deg)`;
+        dice1Ref.current.style.transform = dice1Animation.intermediate;
       }
       if (dice2Ref.current) {
-        dice2Ref.current.style.transform = `rotateX(${data.animation.dice2.totalDegrees}deg)`;
+        dice2Ref.current.style.transform = dice2Animation.intermediate;
       }
       if (dice3Ref.current) {
-        dice3Ref.current.style.transform = `rotateX(${data.animation.dice3.totalDegrees}deg)`;
+        dice3Ref.current.style.transform = dice3Animation.intermediate;
       }
+
+      // After tumbling, land on final faces
+      setTimeout(() => {
+        if (dice1Ref.current) {
+          dice1Ref.current.style.transform = dice1Animation.final;
+        }
+        if (dice2Ref.current) {
+          dice2Ref.current.style.transform = dice2Animation.final;
+        }
+        if (dice3Ref.current) {
+          dice3Ref.current.style.transform = dice3Animation.final;
+        }
+      }, 2000);
 
       // Stop rolling after animation completes
       setTimeout(() => {
@@ -77,7 +119,22 @@ export function ThreeDiceRoll({ faces, disabled, activeCampaign }: ThreeDiceRoll
 
   const handleRoll = () => {
     if (isRolling || disabled) return;
-    rollMutation.mutate();
+    
+    // Reset dice to neutral position before rolling
+    if (dice1Ref.current) {
+      dice1Ref.current.style.transform = "rotateX(0deg) rotateY(0deg) rotateZ(0deg)";
+    }
+    if (dice2Ref.current) {
+      dice2Ref.current.style.transform = "rotateX(0deg) rotateY(0deg) rotateZ(0deg)";
+    }
+    if (dice3Ref.current) {
+      dice3Ref.current.style.transform = "rotateX(0deg) rotateY(0deg) rotateZ(0deg)";
+    }
+    
+    // Start rolling after a brief delay to show reset
+    setTimeout(() => {
+      rollMutation.mutate();
+    }, 100);
   };
 
   const getFaceData = (diceNumber: number, faceNumber: number) => {
@@ -114,7 +171,7 @@ export function ThreeDiceRoll({ faces, disabled, activeCampaign }: ThreeDiceRoll
                   transformStyle: "preserve-3d",
                   margin: "40px",
                   borderRadius: "8px",
-                  transition: isRolling ? "transform 3s cubic-bezier(0.4, 0.0, 0.2, 1)" : "none",
+                  transition: isRolling ? "transform 2s cubic-bezier(0.25, 0.46, 0.45, 0.94)" : "transform 1s ease-out",
                 }}
               >
                 {/* Dice Faces for each dice */}
@@ -123,8 +180,8 @@ export function ThreeDiceRoll({ faces, disabled, activeCampaign }: ThreeDiceRoll
                   const faceStyles = {
                     1: { transform: "rotateY(0deg) translateZ(40px)" }, // Front
                     2: { transform: "rotateY(90deg) translateZ(40px)" }, // Right
-                    3: { transform: "rotateX(90deg) translateZ(40px)" }, // Top
-                    4: { transform: "rotateX(-90deg) translateZ(40px)" }, // Bottom
+                    3: { transform: "rotateX(-90deg) translateZ(40px)" }, // Top
+                    4: { transform: "rotateX(90deg) translateZ(40px)" }, // Bottom
                     5: { transform: "rotateY(-90deg) translateZ(40px)" }, // Left
                     6: { transform: "rotateY(180deg) translateZ(40px)" }, // Back
                   };
