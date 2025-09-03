@@ -47,7 +47,7 @@ export function ThreeDiceRoll({ faces, disabled, activeCampaign }: ThreeDiceRoll
         const randomY = Math.random() * 360 * rotations;
         const randomZ = Math.random() * 360 * rotations;
         
-        // Calculate final position based on face number
+        // Calculate final position based on face number (matching cube layout)
         const faceRotations = {
           1: { x: 0, y: 0, z: 0 },     // Front
           2: { x: 0, y: 90, z: 0 },    // Right  
@@ -93,19 +93,23 @@ export function ThreeDiceRoll({ faces, disabled, activeCampaign }: ThreeDiceRoll
         }
       }, 2000);
 
-      // Stop rolling after animation completes
+      // Stop rolling and show results after dice settle
       setTimeout(() => {
         setIsRolling(false);
-        toast({
-          title: "Three dice rolled!",
-          description: `Results: ${data.result.winner1}, ${data.result.winner2}, ${data.result.winner3}`,
-        });
         
         // Invalidate and refetch queries
         queryClient.invalidateQueries({ queryKey: [`/api/three-dice/results?campaignId=${activeCampaign?.id}`] });
         queryClient.invalidateQueries({ queryKey: ["/api/three-dice/campaigns/active"] });
         queryClient.invalidateQueries({ queryKey: [`/api/three-dice/faces?campaignId=${activeCampaign?.id}`] });
-      }, 3000);
+        
+        // Show notification after everything settles
+        setTimeout(() => {
+          toast({
+            title: "Three dice rolled!",
+            description: `Results: ${data.result.winner1}, ${data.result.winner2}, ${data.result.winner3}`,
+          });
+        }, 200);
+      }, 3200);
     },
     onError: () => {
       setIsRolling(false);
@@ -118,7 +122,7 @@ export function ThreeDiceRoll({ faces, disabled, activeCampaign }: ThreeDiceRoll
   });
 
   const handleRoll = () => {
-    if (isRolling || disabled) return;
+    if (isRolling || disabled || rollMutation.isPending) return;
     
     // Reset dice to neutral position before rolling
     if (dice1Ref.current) {
@@ -131,10 +135,8 @@ export function ThreeDiceRoll({ faces, disabled, activeCampaign }: ThreeDiceRoll
       dice3Ref.current.style.transform = "rotateX(0deg) rotateY(0deg) rotateZ(0deg)";
     }
     
-    // Start rolling after a brief delay to show reset
-    setTimeout(() => {
-      rollMutation.mutate();
-    }, 100);
+    // Start rolling immediately
+    rollMutation.mutate();
   };
 
   const getFaceData = (diceNumber: number, faceNumber: number) => {
