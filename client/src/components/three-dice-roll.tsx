@@ -226,12 +226,12 @@ export function ThreeDiceRoll({ faces, disabled, activeCampaign }: ThreeDiceRoll
         <div className="text-center">
           <Button
             onClick={handleRoll}
-            disabled={isRolling || disabled || rollMutation.isPending}
+            disabled={isRolling || disabled || rollMutation.isPending || rollInProgressRef.current}
             size="lg"
             className="px-8"
             data-testid="button-roll-three-dice"
           >
-            {isRolling ? "Rolling..." : "Roll Three Dice"}
+            {(isRolling || rollInProgressRef.current) ? "Rolling..." : "Roll Three Dice"}
           </Button>
         </div>
 
