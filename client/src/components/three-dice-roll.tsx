@@ -49,14 +49,14 @@ export function ThreeDiceRoll({ faces, disabled, activeCampaign }: ThreeDiceRoll
         const randomY = Math.random() * 360 * rotations;
         const randomZ = Math.random() * 360 * rotations;
         
-        // Calculate final position based on face number (matching cube layout)
+        // Calculate final position - rotate cube to bring desired face to front
         const faceRotations = {
-          1: { x: 0, y: 0, z: 0 },     // Front
-          2: { x: 0, y: 90, z: 0 },    // Right  
-          3: { x: -90, y: 0, z: 0 },   // Top
-          4: { x: 90, y: 0, z: 0 },    // Bottom
-          5: { x: 0, y: -90, z: 0 },   // Left
-          6: { x: 0, y: 180, z: 0 },   // Back
+          1: { x: 0, y: 0, z: 0 },      // Show front face
+          2: { x: 0, y: -90, z: 0 },    // Bring right face to front
+          3: { x: 90, y: 0, z: 0 },     // Bring top face to front
+          4: { x: -90, y: 0, z: 0 },    // Bring bottom face to front
+          5: { x: 0, y: 90, z: 0 },     // Bring left face to front
+          6: { x: 0, y: 180, z: 0 },    // Bring back face to front
         };
         
         const finalRotation = faceRotations[finalFace as keyof typeof faceRotations];
