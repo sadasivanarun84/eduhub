@@ -1,17 +1,25 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, History, Settings, Dice6, Menu, X } from "lucide-react";
+import { ArrowLeft, History, Settings, Dice6, X } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { ThreeDiceRoll } from "@/components/three-dice-roll";
 import { ThreeDiceFaceConfig } from "@/components/three-dice-face-config";
 import type { ThreeDiceCampaign, ThreeDiceFace, ThreeDiceResult } from "@shared/schema";
 
 export function ThreeDiceRollPage() {
   const [configPanelOpen, setConfigPanelOpen] = useState(false);
+  const [hasProcessedReset, setHasProcessedReset] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  // Check if reset was requested via URL parameter
+  const urlParams = new URLSearchParams(window.location.search);
+  const shouldReset = urlParams.get('reset') === 'true';
 
   const { data: activeCampaign, isLoading: campaignLoading } = useQuery<ThreeDiceCampaign>({
     queryKey: ["/api/three-dice/campaigns/active"],
@@ -27,11 +35,71 @@ export function ThreeDiceRollPage() {
     enabled: !!activeCampaign?.id,
   });
 
+  // Reset mutation
+  // Add ESC key support to close configuration panel
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && configPanelOpen) {
+        setConfigPanelOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [configPanelOpen]);
+
+  const resetMutation = useMutation({
+    mutationFn: async (campaignId: string) => {
+      const response = await fetch(`/api/three-dice/campaigns/${campaignId}/reset`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) throw new Error("Failed to reset campaign");
+      return response.json();
+    },
+    onSuccess: () => {
+      // Clear all cache and invalidate queries for fresh data
+      queryClient.clear();
+      setTimeout(() => {
+        Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["/api/three-dice/campaigns/active"], refetchType: 'active' }),
+          queryClient.invalidateQueries({ queryKey: [`/api/three-dice/results?campaignId=${activeCampaign?.id}`], refetchType: 'active' }),
+          queryClient.invalidateQueries({ queryKey: [`/api/three-dice/faces?campaignId=${activeCampaign?.id}`], refetchType: 'active' })
+        ]).then(() => {
+          toast({
+            title: "Game Reset!",
+            description: "A fresh Three Dice Roll game has started. Roll counts and total rolls reset to 100.",
+          });
+        });
+      }, 100);
+    },
+    onError: () => {
+      toast({
+        title: "Reset Failed",
+        description: "Unable to reset the game. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Reset campaign only when coming from home page with reset=true parameter
+  useEffect(() => {
+    if (activeCampaign && shouldReset && !hasProcessedReset && !campaignLoading) {
+      setHasProcessedReset(true);
+      // Clear React Query cache first to ensure fresh data
+      queryClient.clear();
+      resetMutation.mutate(activeCampaign.id);
+      
+      // Remove the reset parameter from URL to prevent repeated resets
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete('reset');
+      window.history.replaceState({}, '', newUrl.pathname + newUrl.search);
+    }
+  }, [activeCampaign, shouldReset, hasProcessedReset, campaignLoading, resetMutation, queryClient]);
+
   const isLoading = campaignLoading || facesLoading || resultsLoading;
-  const hasQuotas = faces.some(face => (face.maxWins || 0) > 0);
-  const totalQuota = faces.reduce((sum, face) => sum + (face.maxWins || 0), 0);
-  const usedQuota = faces.reduce((sum, face) => sum + (face.currentWins || 0), 0);
-  const remainingQuota = Math.max(0, totalQuota - usedQuota);
+  const remainingRolls = Math.max(0, (activeCampaign?.totalRolls || 100) - (activeCampaign?.currentRolls || 0));
+  const rollsExhausted = remainingRolls <= 0;
 
   if (isLoading) {
     return (
@@ -77,9 +145,6 @@ export function ThreeDiceRollPage() {
                 <Dice6 className="h-8 w-8" />
                 Three Dice Roll Game
               </h1>
-              <p className="text-muted-foreground" data-testid="text-campaign-name">
-                Campaign: {activeCampaign.name}
-              </p>
             </div>
           </div>
           <Button 
@@ -88,7 +153,7 @@ export function ThreeDiceRollPage() {
             onClick={() => setConfigPanelOpen(true)}
             data-testid="button-open-config"
           >
-            <Menu className="h-4 w-4" />
+            <Settings className="h-4 w-4" />
           </Button>
         </div>
 
@@ -98,66 +163,65 @@ export function ThreeDiceRollPage() {
             <CardTitle className="text-lg">Campaign Status</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold" data-testid="text-total-winners">
-                  {activeCampaign.currentWinners || 0}
-                </div>
-                <div className="text-sm text-muted-foreground">Total Winners</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600" data-testid="text-total-spent">
-                  ${activeCampaign.currentSpent || 0}
-                </div>
-                <div className="text-sm text-muted-foreground">Total Spent</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold" data-testid="text-quota-used">
-                  {usedQuota}/{totalQuota}
-                </div>
-                <div className="text-sm text-muted-foreground">Quota Used</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold" data-testid="text-remaining-rolls">
-                  {hasQuotas ? remainingQuota : "∞"}
-                </div>
-                <div className="text-sm text-muted-foreground">Remaining Rolls</div>
-              </div>
+            <div className="text-2xl font-bold" data-testid="text-rolls-counter">
+              Rolls: {activeCampaign.currentRolls || 0}/{activeCampaign.totalRolls || 100}
             </div>
           </CardContent>
         </Card>
 
         {/* Main Content */}
-        <div className="flex justify-center">
-          <div className="space-y-6 max-w-2xl w-full">
+        <div className="space-y-6">
             <ThreeDiceRoll 
               faces={faces} 
-              disabled={hasQuotas && remainingQuota <= 0}
+              disabled={rollsExhausted}
               activeCampaign={activeCampaign}
             />
 
             {/* Warning Message */}
-            {hasQuotas && remainingQuota <= 0 && (
+            {rollsExhausted && (
               <Card className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
                 <CardContent className="pt-4">
                   <div className="text-center text-orange-700 dark:text-orange-300">
-                    All prizes have been distributed according to the campaign quotas.
+                    All rolls have been used up. The game has ended.
+                  </div>
+                </CardContent>
+                <CardContent className="pt-4">
+                  <div className="flex justify-center gap-3">
+                    <Link href="/" data-testid="link-home-game-ended">
+                      <Button variant="outline" size="sm">
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Back to Home
+                      </Button>
+                    </Link>
+                    <Button 
+                      variant="default" 
+                      size="sm"
+                      onClick={() => {
+                        if (activeCampaign) {
+                          queryClient.clear();
+                          resetMutation.mutate(activeCampaign.id);
+                        }
+                      }}
+                      disabled={resetMutation.isPending}
+                      data-testid="button-play-again"
+                    >
+                      {resetMutation.isPending ? "Resetting..." : "Play Again"}
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
             )}
-          </div>
         </div>
 
         {/* Sliding Configuration Panel */}
         <div 
-          className={`fixed top-0 right-0 h-full w-96 bg-background border-l border-border shadow-xl transform transition-transform duration-300 ease-in-out z-50 ${
+          className={`fixed top-0 right-0 h-full w-1/3 bg-background border-l border-border shadow-xl transform transition-transform duration-300 ease-in-out z-50 ${
             configPanelOpen ? 'translate-x-0' : 'translate-x-full'
           }`}
           data-testid="config-panel"
         >
           <div className="h-full overflow-y-auto">
-            <div className="sticky top-0 bg-background border-b border-border p-4 flex items-center justify-between">
+            <div className="sticky top-0 bg-background border-b border-border p-4 flex items-center justify-between z-10">
               <h2 className="text-lg font-semibold flex items-center gap-2">
                 <Settings className="h-5 w-5" />
                 Three Dice Configuration
@@ -203,42 +267,69 @@ export function ThreeDiceRollPage() {
                 No rolls yet. Roll the three dice to start!
               </div>
             ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {results.slice(0, 20).map((result, index) => (
-                  <div
-                    key={result.id}
-                    className="flex items-center justify-between p-3 bg-secondary rounded-lg"
-                    data-testid={`result-item-${index}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="flex gap-1">
-                        <div className="px-2 py-1 bg-secondary border rounded text-xs" data-testid={`badge-dice1-face-${index}`}>
-                          D1: {result.dice1Face}
-                        </div>
-                        <div className="px-2 py-1 bg-secondary border rounded text-xs" data-testid={`badge-dice2-face-${index}`}>
-                          D2: {result.dice2Face}
-                        </div>
-                        <div className="px-2 py-1 bg-secondary border rounded text-xs" data-testid={`badge-dice3-face-${index}`}>
-                          D3: {result.dice3Face}
-                        </div>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="font-medium text-sm" data-testid={`text-result-winners-${index}`}>
-                          {result.winner1} | {result.winner2} | {result.winner3}
-                        </div>
-                        {(result.amount1 || result.amount2 || result.amount3) && (
-                          <div className="text-green-600 text-sm" data-testid={`text-result-amounts-${index}`}>
-                            {result.amount1} | {result.amount2} | {result.amount3}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-sm text-muted-foreground" data-testid={`text-result-time-${index}`}>
-                      {result.timestamp ? new Date(result.timestamp).toLocaleTimeString() : ""}
-                    </div>
+              <>
+                {/* Header */}
+                <div className="grid grid-cols-[auto_1fr_1fr_1fr_auto] gap-x-4 mb-4 px-3 py-2 bg-muted rounded-lg items-center" style={{ gridTemplateColumns: 'auto 1fr 1fr 1fr auto', gap: '0 30px' }}>
+                  <div className="text-sm font-semibold text-muted-foreground">#</div>
+                  <div className="flex items-center gap-2">
+                    <Dice6 className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                    <div className="text-sm font-semibold text-muted-foreground">Dice 1</div>
                   </div>
-                ))}
-              </div>
+                  <div className="flex items-center gap-2">
+                    <Dice6 className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                    <div className="text-sm font-semibold text-muted-foreground">Dice 2</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Dice6 className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                    <div className="text-sm font-semibold text-muted-foreground">Dice 3</div>
+                  </div>
+                  <div className="text-sm font-semibold text-muted-foreground text-right">Time</div>
+                </div>
+                
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {results.slice(0, 20).map((result, index) => {
+                    // Find face data to get colors
+                    const dice1Face = faces.find(f => f.diceNumber === 1 && f.faceNumber === result.dice1Face);
+                    const dice2Face = faces.find(f => f.diceNumber === 2 && f.faceNumber === result.dice2Face);
+                    const dice3Face = faces.find(f => f.diceNumber === 3 && f.faceNumber === result.dice3Face);
+                    
+                    return (
+                      <div
+                        key={result.id}
+                        className="grid grid-cols-[auto_1fr_1fr_1fr_auto] p-3 bg-secondary rounded-lg items-center"
+                        style={{ gap: '0 30px' }}
+                        data-testid={`result-item-${index}`}
+                      >
+                        <div className="text-sm font-medium">#{index + 1}</div>
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-full border border-gray-300 flex-shrink-0"
+                            style={{ backgroundColor: dice1Face?.color || '#ffffff' }}
+                          />
+                          <div className="text-sm min-w-0 truncate">{result.winner1}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-full border border-gray-300 flex-shrink-0"
+                            style={{ backgroundColor: dice2Face?.color || '#ffffff' }}
+                          />
+                          <div className="text-sm min-w-0 truncate">{result.winner2}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-full border border-gray-300 flex-shrink-0"
+                            style={{ backgroundColor: dice3Face?.color || '#ffffff' }}
+                          />
+                          <div className="text-sm min-w-0 truncate">{result.winner3}</div>
+                        </div>
+                        <div className="text-sm text-muted-foreground text-right" data-testid={`text-result-time-${index}`}>
+                          {result.timestamp ? new Date(result.timestamp).toLocaleTimeString() : ""}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </CardContent>
         </Card>

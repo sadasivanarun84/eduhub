@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,11 +17,14 @@ const threeDiceFaceSchema = z.object({
   text: z.string().min(1, "Prize text is required"),
   color: z.string().min(1, "Background color is required"),
   textColor: z.string().min(1, "Text color is required"),
-  amount: z.string().optional(),
-  maxWins: z.coerce.number().min(0, "Max wins must be 0 or greater").optional(),
+});
+
+const campaignConfigSchema = z.object({
+  totalRolls: z.number().min(1, "Total rolls must be at least 1").max(1000, "Total rolls cannot exceed 1000"),
 });
 
 type ThreeDiceFaceForm = z.infer<typeof threeDiceFaceSchema>;
+type CampaignConfigForm = z.infer<typeof campaignConfigSchema>;
 
 interface ThreeDiceFaceConfigProps {
   activeCampaign: ThreeDiceCampaign | null;
@@ -30,6 +33,7 @@ interface ThreeDiceFaceConfigProps {
 export function ThreeDiceFaceConfig({ activeCampaign }: ThreeDiceFaceConfigProps) {
   const [editingFace, setEditingFace] = useState<ThreeDiceFace | null>(null);
   const [selectedDice, setSelectedDice] = useState(1);
+  const [configMode, setConfigMode] = useState<"faces" | "campaign">("faces");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -45,10 +49,24 @@ export function ThreeDiceFaceConfig({ activeCampaign }: ThreeDiceFaceConfigProps
       text: "",
       color: "#ffffff",
       textColor: "#000000",
-      amount: "",
-      maxWins: 0,
     },
   });
+
+  const campaignForm = useForm<CampaignConfigForm>({
+    resolver: zodResolver(campaignConfigSchema),
+    defaultValues: {
+      totalRolls: 100, // Always default to 100
+    },
+  });
+
+  // Update form when campaign changes
+  useEffect(() => {
+    if (activeCampaign) {
+      campaignForm.reset({
+        totalRolls: activeCampaign.totalRolls || 100,
+      });
+    }
+  }, [activeCampaign]);
 
   const updateFaceMutation = useMutation({
     mutationFn: async (data: { id: string; updates: Partial<ThreeDiceFace> }) => {
@@ -72,15 +90,67 @@ export function ThreeDiceFaceConfig({ activeCampaign }: ThreeDiceFaceConfigProps
     },
   });
 
+  const applyToAllFacesMutation = useMutation({
+    mutationFn: async (data: { faceNumber: number; updates: Partial<ThreeDiceFace> }) => {
+      // Find all faces with the same face number (across all dice)
+      const facesToUpdate = faces.filter(f => f.faceNumber === data.faceNumber);
+      
+      // Update all faces with the same number
+      const updatePromises = facesToUpdate.map(face => 
+        fetch(`/api/three-dice/faces/${face.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data.updates),
+        })
+      );
+
+      const responses = await Promise.all(updatePromises);
+      const failedResponses = responses.filter(r => !r.ok);
+      
+      if (failedResponses.length > 0) {
+        throw new Error(`Failed to update ${failedResponses.length} face(s)`);
+      }
+      
+      return responses;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/three-dice/faces?campaignId=${activeCampaign?.id}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/three-dice/campaigns/active"] });
+      setEditingFace(null);
+      form.reset();
+      toast({ title: "Applied settings to all matching faces successfully!" });
+    },
+    onError: () => {
+      toast({ title: "Failed to apply to all faces", variant: "destructive" });
+    },
+  });
+
+  const updateCampaignMutation = useMutation({
+    mutationFn: async (data: { id: string; updates: Partial<ThreeDiceCampaign> }) => {
+      const response = await fetch(`/api/three-dice/campaigns/${data.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data.updates),
+      });
+      if (!response.ok) throw new Error("Failed to update campaign");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/three-dice/campaigns/active"] });
+      toast({ title: "Campaign settings updated successfully!" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update campaign settings", variant: "destructive" });
+    },
+  });
+
   const handleEditFace = (face: ThreeDiceFace) => {
     setEditingFace(face);
     setSelectedDice(face.diceNumber);
     form.reset({
       text: face.text,
       color: face.color,
-      amount: face.amount || "",
       textColor: face.textColor || "#000000",
-      maxWins: face.maxWins || 0,
     });
   };
 
@@ -93,8 +163,34 @@ export function ThreeDiceFaceConfig({ activeCampaign }: ThreeDiceFaceConfigProps
         text: data.text,
         color: data.color,
         textColor: data.textColor,
-        amount: data.amount || null,
-        maxWins: data.maxWins || 0,
+        amount: "$0", // Always set to $0
+        maxWins: 0, // Always set to 0 (unlimited)
+      },
+    });
+  };
+
+  const onCampaignSubmit = (data: CampaignConfigForm) => {
+    if (!activeCampaign) return;
+
+    updateCampaignMutation.mutate({
+      id: activeCampaign.id,
+      updates: {
+        totalRolls: data.totalRolls,
+      },
+    });
+  };
+
+  const onApplyToAllFaces = (data: ThreeDiceFaceForm) => {
+    if (!editingFace || !activeCampaign) return;
+
+    applyToAllFacesMutation.mutate({
+      faceNumber: editingFace.faceNumber,
+      updates: {
+        text: data.text,
+        color: data.color,
+        textColor: data.textColor,
+        amount: "$0", // Always set to $0
+        maxWins: 0, // Always set to 0 (unlimited)
       },
     });
   };
@@ -138,23 +234,9 @@ export function ThreeDiceFaceConfig({ activeCampaign }: ThreeDiceFaceConfigProps
   const dice2Faces = faces.filter(f => f.diceNumber === 2).sort((a, b) => a.faceNumber - b.faceNumber);
   const dice3Faces = faces.filter(f => f.diceNumber === 3).sort((a, b) => a.faceNumber - b.faceNumber);
 
-  const totalQuota = faces.reduce((sum, face) => sum + (face.maxWins || 0), 0);
-  const usedQuota = faces.reduce((sum, face) => sum + (face.currentWins || 0), 0);
 
   const renderDiceFaces = (diceFaces: ThreeDiceFace[], diceNumber: number) => (
     <div className="space-y-4">
-      {/* Quota Summary for this dice */}
-      <div className="flex items-center gap-4 p-3 bg-secondary rounded-lg">
-        <div className="text-sm">
-          <span className="font-medium">Dice {diceNumber} Quota:</span>{" "}
-          {diceFaces.reduce((sum, face) => sum + (face.maxWins || 0), 0)} wins
-        </div>
-        <div className="text-sm">
-          <span className="font-medium">Used:</span>{" "}
-          {diceFaces.reduce((sum, face) => sum + (face.currentWins || 0), 0)} wins
-        </div>
-      </div>
-
       {/* Dice Faces Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {diceFaces.map((face) => (
@@ -183,14 +265,6 @@ export function ThreeDiceFaceConfig({ activeCampaign }: ThreeDiceFaceConfigProps
                 >
                   {face.text}
                 </div>
-                {face.amount && (
-                  <div className="text-xs text-green-600" data-testid={`text-face-amount-${diceNumber}-${face.faceNumber}`}>
-                    {face.amount}
-                  </div>
-                )}
-                <div className="text-xs text-muted-foreground" data-testid={`text-face-quota-${diceNumber}-${face.faceNumber}`}>
-                  Quota: {face.currentWins || 0}/{face.maxWins || 0}
-                </div>
               </div>
             </CardContent>
           </Card>
@@ -208,38 +282,79 @@ export function ThreeDiceFaceConfig({ activeCampaign }: ThreeDiceFaceConfigProps
             Three Dice Configuration
           </CardTitle>
           <CardDescription>
-            Configure each of the 3 dice faces and their win quotas separately
+            Configure campaign settings and dice faces
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Overall Quota Summary */}
-          <div className="flex items-center gap-4 p-3 bg-secondary rounded-lg">
-            <div className="text-sm">
-              <span className="font-medium">Total Quota:</span> {totalQuota} wins
-            </div>
-            <div className="text-sm">
-              <span className="font-medium">Used:</span> {usedQuota} wins
-            </div>
-            <div className="text-sm">
-              <span className="font-medium">Remaining:</span> {Math.max(0, totalQuota - usedQuota)} wins
-            </div>
-          </div>
-
-          {/* Tabs for each dice */}
-          <Tabs value={selectedDice.toString()} onValueChange={(value) => setSelectedDice(parseInt(value))}>
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="1" data-testid="tab-dice-1">Dice 1</TabsTrigger>
-              <TabsTrigger value="2" data-testid="tab-dice-2">Dice 2</TabsTrigger>
-              <TabsTrigger value="3" data-testid="tab-dice-3">Dice 3</TabsTrigger>
+          {/* Main configuration tabs */}
+          <Tabs value={configMode} onValueChange={(value) => setConfigMode(value as "faces" | "campaign")}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="faces" data-testid="tab-faces-config">Dice Faces</TabsTrigger>
+              <TabsTrigger value="campaign" data-testid="tab-campaign-config">Campaign Settings</TabsTrigger>
             </TabsList>
-            <TabsContent value="1" className="mt-4">
-              {renderDiceFaces(dice1Faces, 1)}
+            
+            <TabsContent value="faces" className="mt-4">
+              {/* Dice selection tabs */}
+              <Tabs value={selectedDice.toString()} onValueChange={(value) => setSelectedDice(parseInt(value))}>
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="1" data-testid="tab-dice-1">Dice 1</TabsTrigger>
+                  <TabsTrigger value="2" data-testid="tab-dice-2">Dice 2</TabsTrigger>
+                  <TabsTrigger value="3" data-testid="tab-dice-3">Dice 3</TabsTrigger>
+                </TabsList>
+                <TabsContent value="1" className="mt-4">
+                  {renderDiceFaces(dice1Faces, 1)}
+                </TabsContent>
+                <TabsContent value="2" className="mt-4">
+                  {renderDiceFaces(dice2Faces, 2)}
+                </TabsContent>
+                <TabsContent value="3" className="mt-4">
+                  {renderDiceFaces(dice3Faces, 3)}
+                </TabsContent>
+              </Tabs>
             </TabsContent>
-            <TabsContent value="2" className="mt-4">
-              {renderDiceFaces(dice2Faces, 2)}
-            </TabsContent>
-            <TabsContent value="3" className="mt-4">
-              {renderDiceFaces(dice3Faces, 3)}
+
+            <TabsContent value="campaign" className="mt-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Campaign Settings</CardTitle>
+                  <CardDescription>Configure roll limits and other campaign options</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Form {...campaignForm}>
+                    <form onSubmit={campaignForm.handleSubmit(onCampaignSubmit)} className="space-y-4">
+                      <FormField
+                        control={campaignForm.control}
+                        name="totalRolls"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Total Rolls Allowed</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number"
+                                placeholder="100" 
+                                {...field}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                data-testid="input-total-rolls"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="flex gap-2">
+                        <Button 
+                          type="submit" 
+                          disabled={updateCampaignMutation.isPending}
+                          data-testid="button-save-campaign"
+                        >
+                          {updateCampaignMutation.isPending ? "Saving..." : "Save Settings"}
+                        </Button>
+                      </div>
+                    </form>
+                  </Form>
+                </CardContent>
+              </Card>
             </TabsContent>
           </Tabs>
         </CardContent>
@@ -331,52 +446,23 @@ export function ThreeDiceFaceConfig({ activeCampaign }: ThreeDiceFaceConfigProps
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="amount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Prize Value (optional)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="text" 
-                          placeholder="$100 or Free T-shirt" 
-                          {...field} 
-                          data-testid="input-face-amount"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="maxWins"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Maximum Wins (Quota)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          placeholder="0" 
-                          min="0"
-                          {...field} 
-                          data-testid="input-face-max-wins"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
 
                 <div className="flex gap-2">
                   <Button 
                     type="submit" 
-                    disabled={updateFaceMutation.isPending}
+                    disabled={updateFaceMutation.isPending || applyToAllFacesMutation.isPending}
                     data-testid="button-save-face"
                   >
                     {updateFaceMutation.isPending ? "Saving..." : "Save Changes"}
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="secondary"
+                    onClick={() => onApplyToAllFaces(form.getValues())}
+                    disabled={updateFaceMutation.isPending || applyToAllFacesMutation.isPending}
+                    data-testid="button-apply-to-all"
+                  >
+                    {applyToAllFacesMutation.isPending ? "Applying..." : `Apply to All Face ${editingFace?.faceNumber}s`}
                   </Button>
                   <Button 
                     type="button" 

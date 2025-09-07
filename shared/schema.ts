@@ -80,6 +80,8 @@ export const threeDiceCampaigns = pgTable("three_dice_campaigns", {
   totalWinners: integer("total_winners").notNull(),
   currentSpent: integer("current_spent").default(0),
   currentWinners: integer("current_winners").default(0),
+  totalRolls: integer("total_rolls").default(100),
+  currentRolls: integer("current_rolls").default(0),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -163,6 +165,7 @@ export const insertThreeDiceCampaignSchema = createInsertSchema(threeDiceCampaig
   name: true,
   totalAmount: true,
   totalWinners: true,
+  totalRolls: true,
 });
 
 export const insertThreeDiceFaceSchema = createInsertSchema(threeDiceFaces).pick({

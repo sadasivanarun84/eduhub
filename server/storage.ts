@@ -937,7 +937,19 @@ export class MemStorage implements IStorage {
   }
 
   async getActiveThreeDiceCampaign(): Promise<ThreeDiceCampaign | undefined> {
-    return Array.from(this.threeDiceCampaigns.values()).find(campaign => campaign.isActive);
+    const activeCampaign = Array.from(this.threeDiceCampaigns.values()).find(campaign => campaign.isActive);
+    if (activeCampaign) {
+      // Ensure default values for new fields if they don't exist
+      if (activeCampaign.totalRolls === undefined) {
+        activeCampaign.totalRolls = 100;
+      }
+      if (activeCampaign.currentRolls === undefined) {
+        activeCampaign.currentRolls = 0;
+      }
+      // Update the stored campaign with these defaults
+      this.threeDiceCampaigns.set(activeCampaign.id, activeCampaign);
+    }
+    return activeCampaign;
   }
 
   async createThreeDiceCampaign(campaign: InsertThreeDiceCampaign): Promise<ThreeDiceCampaign> {
@@ -947,6 +959,8 @@ export class MemStorage implements IStorage {
       ...campaign,
       currentSpent: 0,
       currentWinners: 0,
+      totalRolls: campaign.totalRolls || 100,
+      currentRolls: 0,
       isActive: true,
       createdAt: new Date(),
     };
@@ -1111,6 +1125,8 @@ export class MemStorage implements IStorage {
     // Reset campaign counters
     campaign.currentSpent = 0;
     campaign.currentWinners = 0;
+    campaign.currentRolls = 0;
+    campaign.totalRolls = 100; // Reset to default
 
     // Clear all three dice results for this campaign
     await this.clearThreeDiceResults(campaignId);

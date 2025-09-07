@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,9 +38,8 @@ export function ThreeDiceRoll({ faces, disabled, activeCampaign }: ThreeDiceRoll
       return response.json();
     },
     onSuccess: (data) => {
-      // Start rolling animation for all three dice
-      setIsRolling(true);
-      rollInProgressRef.current = true;
+      // Rolling animation already started in handleRoll()
+      // rollInProgressRef.current is already true
       
       // Generate random tumbling animation for each dice
       const generateTumbleAnimation = (finalFace: number) => {
@@ -100,10 +99,14 @@ export function ThreeDiceRoll({ faces, disabled, activeCampaign }: ThreeDiceRoll
         setIsRolling(false);
         rollInProgressRef.current = false;
         
-        // Invalidate and refetch queries
-        queryClient.invalidateQueries({ queryKey: [`/api/three-dice/results?campaignId=${activeCampaign?.id}`] });
-        queryClient.invalidateQueries({ queryKey: ["/api/three-dice/campaigns/active"] });
-        queryClient.invalidateQueries({ queryKey: [`/api/three-dice/faces?campaignId=${activeCampaign?.id}`] });
+        // Invalidate and refetch queries immediately
+        Promise.all([
+          queryClient.invalidateQueries({ queryKey: [`/api/three-dice/results?campaignId=${activeCampaign?.id}`], refetchType: 'active' }),
+          queryClient.invalidateQueries({ queryKey: ["/api/three-dice/campaigns/active"], refetchType: 'active' }),
+          queryClient.invalidateQueries({ queryKey: [`/api/three-dice/faces?campaignId=${activeCampaign?.id}`], refetchType: 'active' })
+        ]).then(() => {
+          // Queries invalidated and refetched successfully
+        });
         
         // Show notification after everything settles
         setTimeout(() => {
@@ -133,7 +136,9 @@ export function ThreeDiceRoll({ faces, disabled, activeCampaign }: ThreeDiceRoll
     }
     
     console.log("Starting roll...");
+    // Set both blocking mechanisms immediately
     rollInProgressRef.current = true;
+    setIsRolling(true);
     
     // Reset dice to neutral position before rolling
     if (dice1Ref.current) {
@@ -150,11 +155,38 @@ export function ThreeDiceRoll({ faces, disabled, activeCampaign }: ThreeDiceRoll
     rollMutation.mutate();
   }, [isRolling, disabled, rollMutation]);
 
+  // Add keyboard support for rolling dice
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Only handle keyboard events if not typing in an input
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+      
+      // Prevent repeated keydown events from held keys
+      if (event.repeat) {
+        return;
+      }
+      
+      if (event.code === 'Space' || event.code === 'Enter') {
+        event.preventDefault();
+        // Additional check to prevent double execution during state updates
+        if (!isRolling && !disabled && !rollMutation.isPending && !rollInProgressRef.current) {
+          handleRoll();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleRoll, isRolling, disabled, rollMutation.isPending]);
+
   const getFaceData = (diceNumber: number, faceNumber: number) => {
-    return faces.find(f => f.diceNumber === diceNumber && f.faceNumber === faceNumber) || { 
-      text: faceNumber.toString(), 
-      color: "#ffffff", 
-      textColor: "#000000" 
+    const face = faces.find(f => f.diceNumber === diceNumber && f.faceNumber === faceNumber);
+    return {
+      text: face?.text || faceNumber.toString(),
+      color: face?.color || "#ffffff",
+      textColor: face?.textColor || "#000000"
     };
   };
 
@@ -183,7 +215,7 @@ export function ThreeDiceRoll({ faces, disabled, activeCampaign }: ThreeDiceRoll
                   position: "relative",
                   transformStyle: "preserve-3d",
                   margin: "40px",
-                  borderRadius: "8px",
+                  borderRadius: "16px",
                   transition: isRolling ? "transform 2s cubic-bezier(0.25, 0.46, 0.45, 0.94)" : "transform 1s ease-out",
                 }}
               >
@@ -202,10 +234,12 @@ export function ThreeDiceRoll({ faces, disabled, activeCampaign }: ThreeDiceRoll
                   return (
                     <div
                       key={faceNumber}
-                      className="dice-face absolute w-full h-full border border-gray-400 flex items-center justify-center font-bold text-sm rounded-lg text-center"
+                      className="dice-face absolute w-full h-full flex items-center justify-center font-bold text-sm text-center"
                       style={{
-                        backgroundColor: faceData.color,
+                        backgroundColor: faceData.color || "#ffffff",
                         color: faceData.textColor || "#000000",
+                        borderRadius: "12px",
+                        boxShadow: "inset -2px -2px 4px rgba(0, 0, 0, 0.1), inset 2px 2px 4px rgba(255, 255, 255, 0.3)",
                         ...faceStyles[faceNumber as keyof typeof faceStyles],
                       }}
                       data-testid={`dice-${diceNumber}-face-${faceNumber}`}
@@ -223,7 +257,7 @@ export function ThreeDiceRoll({ faces, disabled, activeCampaign }: ThreeDiceRoll
         </div>
 
         {/* Roll Button */}
-        <div className="text-center">
+        <div className="text-center pt-8">
           <Button
             onClick={handleRoll}
             disabled={isRolling || disabled || rollMutation.isPending || rollInProgressRef.current}
@@ -241,46 +275,8 @@ export function ThreeDiceRoll({ faces, disabled, activeCampaign }: ThreeDiceRoll
             <CardContent className="pt-4">
               <div className="text-center space-y-2">
                 <div className="text-sm text-muted-foreground">Last Roll</div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="text-center">
-                    <div className="text-lg font-semibold" data-testid="text-last-winner-1">
-                      {lastResult.winner1}
-                    </div>
-                    {lastResult.amount1 && (
-                      <div className="text-sm text-green-600" data-testid="text-last-amount-1">
-                        {lastResult.amount1}
-                      </div>
-                    )}
-                    <div className="text-xs text-muted-foreground" data-testid="text-last-dice1-face">
-                      Dice 1 - Face {lastResult.dice1Face}
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-lg font-semibold" data-testid="text-last-winner-2">
-                      {lastResult.winner2}
-                    </div>
-                    {lastResult.amount2 && (
-                      <div className="text-sm text-green-600" data-testid="text-last-amount-2">
-                        {lastResult.amount2}
-                      </div>
-                    )}
-                    <div className="text-xs text-muted-foreground" data-testid="text-last-dice2-face">
-                      Dice 2 - Face {lastResult.dice2Face}
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-lg font-semibold" data-testid="text-last-winner-3">
-                      {lastResult.winner3}
-                    </div>
-                    {lastResult.amount3 && (
-                      <div className="text-sm text-green-600" data-testid="text-last-amount-3">
-                        {lastResult.amount3}
-                      </div>
-                    )}
-                    <div className="text-xs text-muted-foreground" data-testid="text-last-dice3-face">
-                      Dice 3 - Face {lastResult.dice3Face}
-                    </div>
-                  </div>
+                <div className="text-lg font-semibold" data-testid="text-last-winners">
+                  {lastResult.winner1} | {lastResult.winner2} | {lastResult.winner3}
                 </div>
               </div>
             </CardContent>

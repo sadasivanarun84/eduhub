@@ -79,7 +79,7 @@ export default function HomePage() {
                 <Separator />
                 
                 {/* Action Button */}
-                <Link href={game.path}>
+                <Link href={game.id === 'threediceroll' ? `${game.path}?reset=true` : game.path}>
                   <Button 
                     className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors" 
                     variant="outline"

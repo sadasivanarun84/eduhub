@@ -451,6 +451,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!activeCampaign) {
         return res.status(404).json({ message: "No active three dice campaign found" });
       }
+      // Prevent caching to ensure fresh data
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
       res.json(activeCampaign);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch active three dice campaign" });
@@ -600,6 +604,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "No active three dice campaign found" });
       }
 
+      // Check if roll limit has been reached
+      const currentRolls = activeCampaign.currentRolls || 0;
+      const totalRolls = activeCampaign.totalRolls || 100;
+      if (currentRolls >= totalRolls) {
+        return res.status(400).json({ message: "Roll limit has been reached for this campaign" });
+      }
+
       // Get all faces for this campaign
       const threeDiceFaces = await storage.getThreeDiceFaces(activeCampaign.id);
       if (threeDiceFaces.length === 0) {
@@ -638,8 +649,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update campaign statistics
       const currentWinners = (activeCampaign.currentWinners || 0) + 1;
+      const updatedCurrentRolls = (activeCampaign.currentRolls || 0) + 1;
       await storage.updateThreeDiceCampaign(activeCampaign.id, {
         currentWinners,
+        currentRolls: updatedCurrentRolls,
       });
 
       // Generate random rotation for visual effect for each dice
