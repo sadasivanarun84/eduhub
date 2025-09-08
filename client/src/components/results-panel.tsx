@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import type { SpinResult, Campaign, WheelSection } from "@shared/schema";
+import type { SpinResult, Campaign } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 
 interface ResultsPanelProps {
@@ -29,10 +29,6 @@ export function ResultsPanel({ currentResult }: ResultsPanelProps) {
     retry: false,
   });
 
-  // Fetch wheel sections for quota tracking
-  const { data: wheelSections = [] } = useQuery<WheelSection[]>({
-    queryKey: ["/api/wheel-sections"],
-  });
 
   const clearHistoryMutation = useMutation({
     mutationFn: async () => {
@@ -77,21 +73,10 @@ export function ResultsPanel({ currentResult }: ResultsPanelProps) {
           <div className="space-y-4">
             <h3 className="text-lg font-semibold flex items-center gap-2">
               <span>📊</span>
-              Campaign Progress
+              {activeCampaign.name}
             </h3>
             
             <div className="bg-muted/50 rounded-lg p-4 space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="font-medium" data-testid="text-campaign-name">
-                  {activeCampaign.name}
-                </h4>
-                <Badge 
-                  variant="secondary"
-                  data-testid="badge-quota-status"
-                >
-                  📊 Quota System
-                </Badge>
-              </div>
 
               {/* Budget Progress */}
               {activeCampaign.totalAmount && (
@@ -131,43 +116,6 @@ export function ResultsPanel({ currentResult }: ResultsPanelProps) {
                 </div>
               </div>
 
-              {/* Prize Quotas Information */}
-              {wheelSections.filter(section => section.amount && section.maxWins && section.maxWins > 0).length > 0 && (
-                <div className="border-t pt-3 mt-3">
-                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-3">
-                    <span>🎁</span>
-                    Prize Quotas
-                  </div>
-                  <div className="space-y-2">
-                    {wheelSections
-                      .filter(section => section.amount && section.maxWins && section.maxWins > 0)
-                      .map(section => (
-                        <div key={section.id} className="flex items-center justify-between text-sm">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: section.color }}
-                            />
-                            <span>${section.amount?.toLocaleString()}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Progress 
-                              value={section.maxWins ? ((section.currentWins || 0) / section.maxWins) * 100 : 0}
-                              className="w-16 h-1"
-                            />
-                            <span className="text-xs text-muted-foreground w-12">
-                              {section.currentWins || 0}/{section.maxWins}
-                            </span>
-                          </div>
-                        </div>
-                      ))
-                    }
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-2">
-                    ✅ Quota-based prize distribution is active
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         )}

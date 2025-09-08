@@ -4,7 +4,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Trash2 } from "lucide-react";
+import { Trash2, Edit2, Check, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { WheelSection } from "@shared/schema";
 
@@ -22,6 +22,8 @@ const PREDEFINED_COLORS = [
 
 export function WheelControls({ sections, isLoading, onSectionsUpdate }: WheelControlsProps) {
   const [newSectionText, setNewSectionText] = useState("");
+  const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -80,6 +82,30 @@ export function WheelControls({ sections, isLoading, onSectionsUpdate }: WheelCo
       toast({
         title: "Error",
         description: "Failed to update section quota. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateSectionTextMutation = useMutation({
+    mutationFn: async ({ id, text }: { id: string; text: string }) => {
+      const amount = parseAmount(text.trim());
+      return apiRequest("PUT", `/api/wheel-sections/${id}`, { text: text.trim(), amount });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/wheel-sections"] });
+      onSectionsUpdate();
+      setEditingSectionId(null);
+      setEditingText("");
+      toast({
+        title: "Section updated",
+        description: "Wheel section has been updated successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update section. Please try again.",
         variant: "destructive",
       });
     },
@@ -162,6 +188,29 @@ export function WheelControls({ sections, isLoading, onSectionsUpdate }: WheelCo
     }
   };
 
+  const startEditing = (section: WheelSection) => {
+    setEditingSectionId(section.id);
+    setEditingText(section.text);
+  };
+
+  const cancelEditing = () => {
+    setEditingSectionId(null);
+    setEditingText("");
+  };
+
+  const saveEdit = (sectionId: string) => {
+    if (!editingText.trim()) return;
+    updateSectionTextMutation.mutate({ id: sectionId, text: editingText });
+  };
+
+  const handleEditKeyPress = (e: React.KeyboardEvent, sectionId: string) => {
+    if (e.key === "Enter") {
+      saveEdit(sectionId);
+    } else if (e.key === "Escape") {
+      cancelEditing();
+    }
+  };
+
   return (
     <Card className="floating-card">
       <CardHeader>
@@ -215,7 +264,19 @@ export function WheelControls({ sections, isLoading, onSectionsUpdate }: WheelCo
                     className="w-4 h-4 rounded-full"
                     style={{ backgroundColor: section.color }}
                   />
-                  <span className="flex-1">{section.text}</span>
+                  {editingSectionId === section.id ? (
+                    <Input
+                      type="text"
+                      value={editingText}
+                      onChange={(e) => setEditingText(e.target.value)}
+                      onKeyDown={(e) => handleEditKeyPress(e, section.id)}
+                      className="flex-1"
+                      autoFocus
+                      data-testid={`input-edit-${section.id}`}
+                    />
+                  ) : (
+                    <span className="flex-1">{section.text}</span>
+                  )}
                   <div className="flex items-center gap-2">
                     {section.amount && (
                       <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full">
@@ -247,16 +308,53 @@ export function WheelControls({ sections, isLoading, onSectionsUpdate }: WheelCo
                     </div>
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => deleteSectionMutation.mutate(section.id)}
-                  disabled={deleteSectionMutation.isPending}
-                  className="text-muted-foreground hover:text-accent"
-                  data-testid={`button-delete-${section.id}`}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  {editingSectionId === section.id ? (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => saveEdit(section.id)}
+                        disabled={updateSectionTextMutation.isPending}
+                        className="text-green-600 hover:text-green-700"
+                        data-testid={`button-save-${section.id}`}
+                      >
+                        <Check className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={cancelEditing}
+                        className="text-muted-foreground hover:text-red-600"
+                        data-testid={`button-cancel-${section.id}`}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => startEditing(section)}
+                        className="text-muted-foreground hover:text-blue-600"
+                        data-testid={`button-edit-${section.id}`}
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => deleteSectionMutation.mutate(section.id)}
+                        disabled={deleteSectionMutation.isPending}
+                        className="text-muted-foreground hover:text-red-600"
+                        data-testid={`button-delete-${section.id}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </>
+                  )}
+                </div>
               </div>
             ))
           )}

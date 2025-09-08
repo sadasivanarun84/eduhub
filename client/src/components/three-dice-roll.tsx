@@ -14,7 +14,9 @@ interface ThreeDiceRollProps {
 
 export function ThreeDiceRoll({ faces, disabled, activeCampaign }: ThreeDiceRollProps) {
   const [isRolling, setIsRolling] = useState(false);
+  const [buttonGlow, setButtonGlow] = useState(false);
   const rollInProgressRef = useRef(false);
+  const buttonGlowAnimationRef = useRef<number | null>(null);
   const dice1Ref = useRef<HTMLDivElement>(null);
   const dice2Ref = useRef<HTMLDivElement>(null);
   const dice3Ref = useRef<HTMLDivElement>(null);
@@ -155,6 +157,43 @@ export function ThreeDiceRoll({ faces, disabled, activeCampaign }: ThreeDiceRoll
     rollMutation.mutate();
   }, [isRolling, disabled, rollMutation]);
 
+  // Button glow animation functions
+  const startButtonGlowAnimation = () => {
+    let glowState = false;
+    
+    const animate = () => {
+      glowState = !glowState;
+      setButtonGlow(glowState);
+      buttonGlowAnimationRef.current = setTimeout(animate, 1000); // Toggle every 1 second
+    };
+    
+    animate();
+  };
+
+  const stopButtonGlowAnimation = () => {
+    if (buttonGlowAnimationRef.current) {
+      clearTimeout(buttonGlowAnimationRef.current);
+      buttonGlowAnimationRef.current = null;
+    }
+    setButtonGlow(false);
+  };
+
+  // Start button glow animation when not rolling
+  useEffect(() => {
+    if (!isRolling && !disabled && !rollMutation.isPending && !rollInProgressRef.current) {
+      startButtonGlowAnimation();
+    } else {
+      stopButtonGlowAnimation();
+    }
+  }, [isRolling, disabled, rollMutation.isPending, rollInProgressRef.current]);
+
+  // Cleanup glow animation on unmount
+  useEffect(() => {
+    return () => {
+      stopButtonGlowAnimation();
+    };
+  }, []);
+
   // Add keyboard support for rolling dice
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -262,10 +301,17 @@ export function ThreeDiceRoll({ faces, disabled, activeCampaign }: ThreeDiceRoll
             onClick={handleRoll}
             disabled={isRolling || disabled || rollMutation.isPending || rollInProgressRef.current}
             size="lg"
-            className="px-8"
+            className={`px-12 py-4 rounded-full font-bold text-xl shadow-lg disabled:opacity-50 transition-all duration-300 ${
+              buttonGlow && !isRolling && !disabled && !rollMutation.isPending && !rollInProgressRef.current 
+                ? 'shadow-2xl ring-4 ring-yellow-400 ring-opacity-60' 
+                : ''
+            }`}
+            style={buttonGlow && !isRolling && !disabled && !rollMutation.isPending && !rollInProgressRef.current ? {
+              boxShadow: '0 0 30px rgba(255, 255, 0, 0.6), 0 0 60px rgba(255, 255, 0, 0.4)'
+            } : {}}
             data-testid="button-roll-three-dice"
           >
-            {(isRolling || rollInProgressRef.current) ? "Rolling..." : "Roll Three Dice"}
+            {(isRolling || rollInProgressRef.current) ? "Rolling..." : "ROLL THE DICES"}
           </Button>
         </div>
 
