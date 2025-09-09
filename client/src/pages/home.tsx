@@ -29,6 +29,14 @@ export default function HomePage() {
       features: ["3 independent dice", "18 configurable faces", "Separate dice quotas", "Combo rewards"],
       status: "Available"
     },
+    {
+      id: "slotmachine",
+      title: "🎰 Slot Machine",
+      description: "Classic 3-reel slot machine with animated spinning reels, realistic symbols, and configurable payouts. Includes credit system, statistics tracking, and achievement badges.",
+      path: "/slotmachine",
+      features: ["3 spinning reels", "7 unique symbols", "Multiple payouts", "Stats tracking"],
+      status: "Available"
+    },
     // Future games will be added here
   ];
 
@@ -118,7 +126,7 @@ export default function HomePage() {
                 </div>
                 <div className="flex items-center">
                   <span className="w-1.5 h-1.5 bg-muted-foreground/50 rounded-full mr-2"></span>
-                  Slot Machine
+                  Card Games
                 </div>
               </div>
               <Button 

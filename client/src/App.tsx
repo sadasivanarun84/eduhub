@@ -7,6 +7,7 @@ import HomePage from "@/pages/home";
 import SpinWheelPage from "@/pages/spin-wheel";
 import { DiceRollPage } from "@/pages/dice-roll";
 import { ThreeDiceRollPage } from "@/pages/three-dice-roll";
+import SlotMachinePage from "@/pages/slot-machine";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -16,6 +17,7 @@ function Router() {
       <Route path="/spinwheel" component={SpinWheelPage} />
       <Route path="/diceroll" component={DiceRollPage} />
       <Route path="/threediceroll" component={ThreeDiceRollPage} />
+      <Route path="/slotmachine" component={SlotMachinePage} />
       <Route component={NotFound} />
     </Switch>
   );
