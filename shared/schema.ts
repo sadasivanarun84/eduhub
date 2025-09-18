@@ -13,6 +13,8 @@ export const campaigns = pgTable("campaigns", {
   rotationSequence: json("rotation_sequence").$type<number[]>().default([]), // Array of section indexes in rotation order
   currentSequenceIndex: integer("current_sequence_index").default(0), // Current position in rotation sequence
   isActive: boolean("is_active").default(true),
+  userId: varchar("user_id").references(() => users.id), // Owner of this campaign
+  isPublic: boolean("is_public").default(false), // Public campaigns visible to all
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -47,6 +49,8 @@ export const diceCampaigns = pgTable("dice_campaigns", {
   rotationSequence: json("rotation_sequence").$type<number[]>().default([]), // Array of dice face numbers (1-6)
   currentSequenceIndex: integer("current_sequence_index").default(0),
   isActive: boolean("is_active").default(true),
+  userId: varchar("user_id").references(() => users.id), // Owner of this campaign
+  isPublic: boolean("is_public").default(false), // Public campaigns visible to all
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -83,6 +87,8 @@ export const threeDiceCampaigns = pgTable("three_dice_campaigns", {
   totalRolls: integer("total_rolls").default(100),
   currentRolls: integer("current_rolls").default(0),
   isActive: boolean("is_active").default(true),
+  userId: varchar("user_id").references(() => users.id), // Owner of this campaign
+  isPublic: boolean("is_public").default(false), // Public campaigns visible to all
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -216,16 +222,49 @@ export type ThreeDiceFace = typeof threeDiceFaces.$inferSelect;
 export type InsertThreeDiceResult = z.infer<typeof insertThreeDiceResultSchema>;
 export type ThreeDiceResult = typeof threeDiceResults.$inferSelect;
 
-// Keep existing user schema
+// Slot Machine User Settings
+export const userSlotSettings = pgTable("user_slot_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  credits: integer("credits").default(1000),
+  defaultBet: integer("default_bet").default(10),
+  totalSpins: integer("total_spins").default(0),
+  totalWins: integer("total_wins").default(0),
+  totalWinnings: integer("total_winnings").default(0),
+  biggestWin: integer("biggest_win").default(0),
+  winStreak: integer("win_streak").default(0),
+  currentStreak: integer("current_streak").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUserSlotSettingsSchema = createInsertSchema(userSlotSettings).pick({
+  userId: true,
+  credits: true,
+  defaultBet: true,
+});
+
+export type InsertUserSlotSettings = z.infer<typeof insertUserSlotSettingsSchema>;
+export type UserSlotSettings = typeof userSlotSettings.$inferSelect;
+
+// Enhanced user schema with Google OAuth support
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  email: text("email").notNull().unique(),
+  googleId: text("google_id").unique(),
+  displayName: text("display_name"),
+  profilePicture: text("profile_picture"),
+  role: text("role").notNull().default("user"), // "user", "admin", "super_admin"
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  lastLoginAt: timestamp("last_login_at"),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+  email: true,
+  googleId: true,
+  displayName: true,
+  profilePicture: true,
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;

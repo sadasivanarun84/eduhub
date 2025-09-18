@@ -21,6 +21,8 @@ steps:
     - '--platform'
     - 'managed'
     - '--allow-unauthenticated'
+    - '--set-env-vars'
+    - 'FIREBASE_PROJECT_ID=gamehub-61b0e,NODE_ENV=production'
 
 images:
 - 'gcr.io/$PROJECT_ID/game-hub:$BUILD_ID'

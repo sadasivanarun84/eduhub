@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { AuthButton } from "@/components/auth-button";
 
 export default function HomePage() {
   const games = [
@@ -37,6 +38,14 @@ export default function HomePage() {
       features: ["3 spinning reels", "7 unique symbols", "Multiple payouts", "Stats tracking"],
       status: "Available"
     },
+    {
+      id: "popquiz",
+      title: "🧠 The Pop Quiz",
+      description: "Fun and interactive quiz game for kids! Administrators can create custom questions assigned to specific users. Perfect for educational activities and knowledge testing.",
+      path: "/popquiz",
+      features: ["Custom questions", "Kid-friendly UI", "Score tracking", "Admin management"],
+      status: "Available"
+    },
     // Future games will be added here
   ];
 
@@ -44,6 +53,9 @@ export default function HomePage() {
     <div className="min-h-screen p-4 lg:p-8" data-testid="home-page">
       {/* Header Section */}
       <header className="text-center mb-8 lg:mb-12">
+        <div className="flex justify-end mb-4">
+          <AuthButton />
+        </div>
         <h1 className="text-4xl lg:text-6xl font-bold bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent mb-4">
           🎮 Game Hub
         </h1>
@@ -83,13 +95,13 @@ export default function HomePage() {
                     ))}
                   </ul>
                 </div>
-                
+
                 <Separator />
-                
+
                 {/* Action Button */}
                 <Link href={game.id === 'threediceroll' ? `${game.path}?reset=true` : game.path}>
-                  <Button 
-                    className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors" 
+                  <Button
+                    className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
                     variant="outline"
                     data-testid={`button-play-${game.id}`}
                   >

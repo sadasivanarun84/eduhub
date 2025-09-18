@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
@@ -5,6 +6,19 @@ import { setupVite, serveStatic, log } from "./vite";
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// CORS configuration for Firebase Auth
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -57,15 +71,11 @@ app.use((req, res, next) => {
   }
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
-  // For development, use 3000. For production (Cloud Run), use 5000 or PORT env var
+  // For development, use 3000. For production (Cloud Run), use PORT env var (usually 8080)
   const isDev = process.env.NODE_ENV === 'development';
-  const port = parseInt(process.env.PORT || (isDev ? '3000' : '5000'), 10);
-  
-  const listenOptions = isDev 
-    ? { port, host: "localhost" }  // Development: localhost only
-    : { port, host: "0.0.0.0", reusePort: true };  // Production: all interfaces
-  
-  server.listen(listenOptions, () => {
+  const port = parseInt(process.env.PORT || (isDev ? '3000' : '8080'), 10);
+
+  server.listen(port, '0.0.0.0', () => {
     log(`serving on ${isDev ? 'http://localhost' : '0.0.0.0'}:${port}`);
   });
 })();
