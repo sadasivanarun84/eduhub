@@ -9,6 +9,7 @@ import { CreateClassroomDialog } from "@/components/create-classroom-dialog";
 import { ClassroomDetailsDialog } from "@/components/classroom-details-dialog";
 import { CreateSubjectDialog } from "@/components/create-subject-dialog";
 import { FlashCardDisplay } from "@/components/flashcard-display";
+import { apiGet, apiDelete } from "@/lib/api-utils";
 import { Users, BookOpen, Plus, Settings, Trash2 } from "lucide-react";
 
 interface Classroom {
@@ -58,7 +59,7 @@ export function PeriodicTablePage() {
   const loadData = async () => {
     try {
       // Fetch classrooms
-      const classroomsResponse = await fetch('/api/classrooms');
+      const classroomsResponse = await apiGet('/api/classrooms');
       if (classroomsResponse.ok) {
         const classroomsData = await classroomsResponse.json();
         setClassrooms(classroomsData.map((c: any) => ({
@@ -69,7 +70,7 @@ export function PeriodicTablePage() {
       }
 
       // Fetch subjects
-      const subjectsResponse = await fetch('/api/subjects');
+      const subjectsResponse = await apiGet('/api/subjects');
       if (subjectsResponse.ok) {
         const subjectsData = await subjectsResponse.json();
         setSubjects(subjectsData);
@@ -125,8 +126,7 @@ export function PeriodicTablePage() {
       const idToken = await firebaseUser.getIdToken();
       const endpoint = itemToDelete.type === 'subject' ? `/api/subjects/${itemToDelete.id}` : `/api/classrooms/${itemToDelete.id}`;
 
-      const response = await fetch(endpoint, {
-        method: 'DELETE',
+      const response = await apiDelete(endpoint, {
         headers: {
           'Authorization': `Bearer ${idToken}`,
         },
