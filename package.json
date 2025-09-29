@@ -1,5 +1,5 @@
 {
-  "name": "rest-express",
+  "name": "eduhub",
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
@@ -12,7 +12,7 @@
     "deploy": "./deploy.sh",
     "gcp:setup": "gcloud services enable cloudbuild.googleapis.com run.googleapis.com containerregistry.googleapis.com",
     "gcp:deploy": "gcloud builds submit --config cloudbuild.yaml",
-    "gcp:logs": "gcloud run logs tail game-hub --region=us-central1",
+    "gcp:logs": "gcloud run logs tail eduhub --region=us-central1",
     "setup:firebase": "node scripts/setup-firebase.js",
     "setup:check": "node scripts/setup-firebase.js"
   },

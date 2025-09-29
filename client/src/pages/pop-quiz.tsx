@@ -24,7 +24,7 @@ const getCategoryEmoji = (category: string): string => {
 const SUPER_ADMIN_EMAIL = 'sadasivanarun84@gmail.com';
 
 // Default background image
-const DEFAULT_BACKGROUND = 'https://storage.googleapis.com/gamehub-61b0e.firebasestorage.app/quiz-images/488154a9-0c1c-41f7-874d-1e055a0f3b43.jpg';
+const DEFAULT_BACKGROUND = 'https://storage.googleapis.com/eduhub-aa47b.firebasestorage.app/quiz-images/default-background.jpg';
 
 // Function to get the appropriate background image
 const getBackgroundImage = (currentQuestion?: QuizQuestion): string => {
@@ -418,7 +418,7 @@ export function PopQuizPage() {
                   You scored {session.score} out of {session.sessionQuestions.length}!
                 </p>
                 <p className="text-2xl font-bold text-green-600">
-                  You can go to the next round!
+                  You Can Move Forward
                 </p>
               </div>
               <div className="bg-yellow-100 border-yellow-400 border rounded-lg p-4">

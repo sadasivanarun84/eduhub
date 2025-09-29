@@ -12,7 +12,7 @@ env:
   # Configure environment variables.
   # See https://firebase.google.com/docs/app-hosting/configure#user-defined-environment
   - variable: FIREBASE_PROJECT_ID
-    value: gamehub-61b0e
+    value: eduhub-aa47b
     availability:
       - BUILD
       - RUNTIME

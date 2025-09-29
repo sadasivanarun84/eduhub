@@ -269,3 +269,113 @@ export const insertUserSchema = createInsertSchema(users).pick({
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+// Periodic Table Learning System
+export const classrooms = pgTable("classrooms", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  ownerId: varchar("owner_id").notNull().references(() => users.id), // Super admin who created it
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const classroomAdmins = pgTable("classroom_admins", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  classroomId: varchar("classroom_id").notNull().references(() => classrooms.id),
+  adminId: varchar("admin_id").notNull().references(() => users.id),
+  assignedAt: timestamp("assigned_at").defaultNow(),
+});
+
+export const classroomStudents = pgTable("classroom_students", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  classroomId: varchar("classroom_id").notNull().references(() => classrooms.id),
+  studentId: varchar("student_id").notNull().references(() => users.id),
+  enrolledAt: timestamp("enrolled_at").defaultNow(),
+});
+
+export const subjects = pgTable("subjects", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  createdById: varchar("created_by_id").notNull().references(() => users.id),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const classroomSubjects = pgTable("classroom_subjects", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  classroomId: varchar("classroom_id").notNull().references(() => classrooms.id),
+  subjectId: varchar("subject_id").notNull().references(() => subjects.id),
+  assignedAt: timestamp("assigned_at").defaultNow(),
+});
+
+export const flashCards = pgTable("flash_cards", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  subjectId: varchar("subject_id").notNull().references(() => subjects.id),
+  frontContent: text("front_content").notNull(),
+  backContent: text("back_content").notNull(),
+  frontImageUrl: text("front_image_url"),
+  backImageUrl: text("back_image_url"),
+  order: integer("order").notNull().default(0),
+  createdById: varchar("created_by_id").notNull().references(() => users.id),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const studentProgress = pgTable("student_progress", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  studentId: varchar("student_id").notNull().references(() => users.id),
+  flashCardId: varchar("flash_card_id").notNull().references(() => flashCards.id),
+  correctAnswers: integer("correct_answers").default(0),
+  totalAttempts: integer("total_attempts").default(0),
+  lastStudiedAt: timestamp("last_studied_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Periodic Table schemas
+export const insertClassroomSchema = createInsertSchema(classrooms).pick({
+  name: true,
+  description: true,
+  ownerId: true,
+});
+
+export const insertSubjectSchema = createInsertSchema(subjects).pick({
+  name: true,
+  description: true,
+  createdById: true,
+});
+
+export const insertFlashCardSchema = createInsertSchema(flashCards).pick({
+  subjectId: true,
+  frontContent: true,
+  backContent: true,
+  frontImageUrl: true,
+  backImageUrl: true,
+  order: true,
+  createdById: true,
+});
+
+export const insertStudentProgressSchema = createInsertSchema(studentProgress).pick({
+  studentId: true,
+  flashCardId: true,
+  correctAnswers: true,
+  totalAttempts: true,
+});
+
+// Periodic Table types
+export type InsertClassroom = z.infer<typeof insertClassroomSchema>;
+export type Classroom = typeof classrooms.$inferSelect;
+export type ClassroomAdmin = typeof classroomAdmins.$inferSelect;
+export type ClassroomStudent = typeof classroomStudents.$inferSelect;
+export type ClassroomSubject = typeof classroomSubjects.$inferSelect;
+export type InsertSubject = z.infer<typeof insertSubjectSchema>;
+export type Subject = typeof subjects.$inferSelect;
+export type InsertFlashCard = z.infer<typeof insertFlashCardSchema>;
+export type FlashCard = typeof flashCards.$inferSelect;
+export type InsertStudentProgress = z.infer<typeof insertStudentProgressSchema>;
+export type StudentProgress = typeof studentProgress.$inferSelect;

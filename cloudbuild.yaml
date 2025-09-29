@@ -1,11 +1,11 @@
 steps:
   # Build the container image
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/game-hub:$BUILD_ID', '.']
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/eduhub:$BUILD_ID', '.']
   
   # Push the container image to Container Registry
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/game-hub:$BUILD_ID']
+    args: ['push', 'gcr.io/$PROJECT_ID/eduhub:$BUILD_ID']
   
   # Deploy container image to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -13,16 +13,16 @@ steps:
     args:
     - 'run'
     - 'deploy'
-    - 'game-hub'
+    - 'eduhub'
     - '--image'
-    - 'gcr.io/$PROJECT_ID/game-hub:$BUILD_ID'
+    - 'gcr.io/$PROJECT_ID/eduhub:$BUILD_ID'
     - '--region'
     - 'us-central1'
     - '--platform'
     - 'managed'
     - '--allow-unauthenticated'
     - '--set-env-vars'
-    - 'FIREBASE_PROJECT_ID=gamehub-61b0e,NODE_ENV=production'
+    - 'FIREBASE_PROJECT_ID=eduhub-aa47b,NODE_ENV=production'
 
 images:
-- 'gcr.io/$PROJECT_ID/game-hub:$BUILD_ID'
+- 'gcr.io/$PROJECT_ID/eduhub:$BUILD_ID'

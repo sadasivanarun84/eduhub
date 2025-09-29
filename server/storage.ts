@@ -1,9 +1,11 @@
-import { 
-  type User, type InsertUser, type WheelSection, type InsertWheelSection, type SpinResult, type InsertSpinResult, 
-  type Campaign, type InsertCampaign, type DiceCampaign, type DiceFace, type DiceResult, 
+import {
+  type User, type InsertUser, type WheelSection, type InsertWheelSection, type SpinResult, type InsertSpinResult,
+  type Campaign, type InsertCampaign, type DiceCampaign, type DiceFace, type DiceResult,
   type InsertDiceCampaign, type InsertDiceFace, type InsertDiceResult,
   type ThreeDiceCampaign, type ThreeDiceFace, type ThreeDiceResult,
-  type InsertThreeDiceCampaign, type InsertThreeDiceFace, type InsertThreeDiceResult 
+  type InsertThreeDiceCampaign, type InsertThreeDiceFace, type InsertThreeDiceResult,
+  type Classroom, type InsertClassroom, type Subject, type InsertSubject, type FlashCard, type InsertFlashCard,
+  type ClassroomAdmin, type ClassroomStudent, type StudentProgress, type InsertStudentProgress
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -82,6 +84,47 @@ export interface IStorage {
   clearThreeDiceResults(campaignId?: string): Promise<void>;
   
   resetThreeDiceCampaign(campaignId: string): Promise<ThreeDiceCampaign>;
+
+  // Periodic Table Learning System Methods
+  // Classrooms
+  getClassrooms(): Promise<Classroom[]>;
+  getClassroom(id: string): Promise<Classroom | undefined>;
+  createClassroom(classroom: InsertClassroom): Promise<Classroom>;
+  updateClassroom(id: string, updates: Partial<Classroom>): Promise<Classroom>;
+  deleteClassroom(id: string): Promise<void>;
+
+  // Classroom Admins
+  addClassroomAdmin(classroomId: string, adminId: string): Promise<ClassroomAdmin>;
+  removeClassroomAdmin(classroomId: string, adminId: string): Promise<void>;
+  getClassroomAdmins(classroomId: string): Promise<ClassroomAdmin[]>;
+
+  // Classroom Students
+  addClassroomStudent(classroomId: string, studentId: string): Promise<ClassroomStudent>;
+  removeClassroomStudent(classroomId: string, studentId: string): Promise<void>;
+  getClassroomStudents(classroomId: string): Promise<ClassroomStudent[]>;
+
+  // Subjects
+  getSubjects(classroomId?: string): Promise<Subject[]>;
+  getSubject(id: string): Promise<Subject | undefined>;
+  createSubject(subject: InsertSubject): Promise<Subject>;
+  updateSubject(id: string, updates: Partial<Subject>): Promise<Subject>;
+  deleteSubject(id: string): Promise<void>;
+
+  // Subject-Classroom associations
+  linkSubjectToClassroom(subjectId: string, classroomId: string): Promise<void>;
+  unlinkSubjectFromClassroom(subjectId: string, classroomId: string): Promise<void>;
+  isSubjectLinkedToClassroom(subjectId: string, classroomId: string): Promise<boolean>;
+
+  // Flash Cards
+  getFlashCards(subjectId?: string): Promise<FlashCard[]>;
+  getFlashCard(id: string): Promise<FlashCard | undefined>;
+  createFlashCard(flashCard: InsertFlashCard): Promise<FlashCard>;
+  updateFlashCard(id: string, updates: Partial<FlashCard>): Promise<FlashCard>;
+  deleteFlashCard(id: string): Promise<void>;
+
+  // Student Progress
+  getStudentProgress(studentId: string, subjectId?: string): Promise<StudentProgress[]>;
+  updateStudentProgress(studentId: string, flashCardId: string, progress: InsertStudentProgress): Promise<StudentProgress>;
 }
 
 export class MemStorage implements IStorage {

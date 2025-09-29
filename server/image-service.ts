@@ -181,6 +181,38 @@ class ImageService {
       throw new Error(`Failed to get images by category: ${error.message}`);
     }
   }
+
+  async uploadFlashCardImage(
+    fileBuffer: Buffer,
+    originalFileName: string,
+    mimeType: string,
+    uploadedBy: string
+  ): Promise<{ url: string }> {
+    try {
+      const fileExtension = originalFileName.split('.').pop() || 'jpg';
+      const fileName = `flashcard-images/${uuidv4()}.${fileExtension}`;
+
+      console.log('[ImageService] Uploading flashcard image to Firebase Storage:', fileName);
+      const file = this.storageBucket.file(fileName);
+
+      await file.save(fileBuffer, {
+        metadata: {
+          contentType: mimeType,
+        },
+      });
+
+      // Make the file publicly readable
+      await file.makePublic();
+
+      const publicUrl = `https://storage.googleapis.com/${this.storageBucket.name}/${fileName}`;
+      console.log('[ImageService] Flashcard image uploaded successfully:', publicUrl);
+
+      return { url: publicUrl };
+    } catch (error) {
+      console.error('[ImageService] Error uploading flashcard image:', error);
+      throw new Error('Failed to upload flashcard image');
+    }
+  }
 }
 
 export const imageService = new ImageService();

@@ -4,7 +4,10 @@ import { requireFirebaseAuth, requireAdmin, requireSuperAdmin, verifyFirebaseTok
 import { storage } from "./storage";
 import { quizService } from "./quiz-service";
 import { imageService } from "./image-service";
-import { insertWheelSectionSchema, insertSpinResultSchema, insertCampaignSchema, insertDiceCampaignSchema, insertDiceFaceSchema, insertDiceResultSchema, insertThreeDiceCampaignSchema, insertThreeDiceFaceSchema, insertThreeDiceResultSchema } from "@shared/schema";
+import {
+  insertWheelSectionSchema, insertSpinResultSchema, insertCampaignSchema, insertDiceCampaignSchema, insertDiceFaceSchema, insertDiceResultSchema, insertThreeDiceCampaignSchema, insertThreeDiceFaceSchema, insertThreeDiceResultSchema,
+  insertClassroomSchema, insertSubjectSchema, insertFlashCardSchema
+} from "@shared/schema";
 import multer from 'multer';
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -1060,6 +1063,608 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Image not found" });
       }
       res.status(500).json({ message: error.message || "Failed to delete image" });
+    }
+  });
+
+  // ===============================
+  // PERIODIC TABLE LEARNING SYSTEM ROUTES
+  // ===============================
+
+  // Classrooms routes
+  app.get("/api/classrooms", async (req, res) => {
+    try {
+      const classrooms = await storage.getClassrooms();
+      console.log(`=== Processing ${classrooms.length} classrooms for counts ===`);
+
+      // Add subject count and total flashcard count for each classroom
+      const classroomsWithCounts = await Promise.all(
+        classrooms.map(async (classroom) => {
+          const subjects = await storage.getSubjects(classroom.id);
+          console.log(`Classroom ${classroom.name} (${classroom.id}): ${subjects.length} subjects`);
+
+          // Calculate total flashcard count across all subjects in this classroom
+          let totalFlashcards = 0;
+          for (const subject of subjects) {
+            const flashcards = await storage.getFlashCards(subject.id);
+            totalFlashcards += flashcards.length;
+            console.log(`  Subject ${subject.name}: ${flashcards.length} flashcards`);
+          }
+
+          const result = {
+            ...classroom,
+            subjectCount: subjects.length,
+            totalFlashcards
+          };
+
+          console.log(`Final counts for ${classroom.name}: subjectCount=${result.subjectCount}, totalFlashcards=${result.totalFlashcards}`);
+          return result;
+        })
+      );
+
+      // Add cache control headers to prevent caching
+      res.set({
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+
+      console.log("=== Sending classroom data with counts ===");
+      res.json(classroomsWithCounts);
+    } catch (error) {
+      console.error("Error getting classrooms:", error);
+      res.status(500).json({ message: "Failed to get classrooms" });
+    }
+  });
+
+  // Get detailed classroom information
+  app.get("/api/classrooms/:id", requireFirebaseAuth, async (req, res) => {
+    try {
+      const classroom = await storage.getClassroom(req.params.id);
+      if (!classroom) {
+        return res.status(404).json({ message: "Classroom not found" });
+      }
+
+      // Get related data
+      const [students, admins, classroomSubjects] = await Promise.all([
+        storage.getClassroomStudents(req.params.id),
+        storage.getClassroomAdmins(req.params.id),
+        storage.getSubjects(req.params.id)
+      ]);
+
+      // Get flash card counts for each subject
+      const subjectsWithFlashCards = await Promise.all(
+        classroomSubjects.map(async (subject) => {
+          const flashCards = await storage.getFlashCards(subject.id);
+          return {
+            ...subject,
+            flashCardCount: flashCards.length
+          };
+        })
+      );
+
+      const detailedClassroom = {
+        ...classroom,
+        students,
+        admins,
+        subjects: subjectsWithFlashCards
+      };
+
+      console.log(`=== Classroom ${classroom.id} Details ===`);
+      console.log(`Classroom name: ${classroom.name}`);
+      console.log(`Subjects found: ${classroomSubjects.length}`);
+      console.log(`Subjects:`, classroomSubjects.map(s => ({ id: s.id, name: s.name })));
+
+      res.json(detailedClassroom);
+    } catch (error) {
+      console.error("Error getting classroom details:", error);
+      res.status(500).json({ message: "Failed to get classroom details" });
+    }
+  });
+
+  app.post("/api/classrooms", requireFirebaseAuth, requireSuperAdmin, async (req, res) => {
+    try {
+      console.log("=== Classroom Creation Debug ===");
+      console.log("Request body:", JSON.stringify(req.body, null, 2));
+      console.log("User:", JSON.stringify(req.user, null, 2));
+
+      const validatedData = insertClassroomSchema.parse(req.body);
+      console.log("Validated data:", JSON.stringify(validatedData, null, 2));
+
+      console.log("Calling storage.createClassroom...");
+      const classroom = await storage.createClassroom(validatedData);
+      console.log("Classroom created successfully:", JSON.stringify(classroom, null, 2));
+
+      res.json(classroom);
+    } catch (error) {
+      console.error("Error creating classroom:", error);
+      console.error("Error stack:", error.stack);
+      res.status(400).json({ message: "Failed to create classroom", error: error.message });
+    }
+  });
+
+  // Delete classroom (Option B: Cascade Deletion - Remove all associations)
+  app.delete("/api/classrooms/:id", requireFirebaseAuth, async (req, res) => {
+    try {
+      const classroomId = req.params.id;
+      console.log(`=== Deleting classroom ${classroomId} ===`);
+
+      // Step 1: Remove all student associations
+      console.log("Step 1: Getting classroom students...");
+      const classroomStudents = await storage.getClassroomStudents(classroomId);
+      console.log(`Found ${classroomStudents.length} students to remove`);
+
+      for (const student of classroomStudents) {
+        console.log(`Removing student ${student.studentId}...`);
+        await storage.removeClassroomStudent(classroomId, student.studentId);
+      }
+
+      // Step 2: Remove all admin associations
+      console.log("Step 2: Getting classroom admins...");
+      const classroomAdmins = await storage.getClassroomAdmins(classroomId);
+      console.log(`Found ${classroomAdmins.length} admins to remove`);
+
+      for (const admin of classroomAdmins) {
+        console.log(`Removing admin ${admin.adminId}...`);
+        await storage.removeClassroomAdmin(classroomId, admin.adminId);
+      }
+
+      // Step 3: Delete the classroom itself (subjects remain independent)
+      console.log("Step 3: Deleting classroom document...");
+      await storage.deleteClassroom(classroomId);
+      console.log("Classroom deletion completed successfully");
+
+      res.json({
+        message: "Classroom deleted successfully",
+        removedStudents: classroomStudents.length,
+        removedAdmins: classroomAdmins.length
+      });
+    } catch (error) {
+      console.error("Error deleting classroom:", error);
+      res.status(500).json({ message: "Failed to delete classroom" });
+    }
+  });
+
+  // Subjects routes
+  app.get("/api/subjects", async (req, res) => {
+    try {
+      const classroomId = req.query.classroomId as string | undefined;
+      const subjects = await storage.getSubjects(classroomId);
+
+      // Add flashcard count for each subject
+      const subjectsWithFlashCardCounts = await Promise.all(
+        subjects.map(async (subject) => {
+          const flashcards = await storage.getFlashCards(subject.id);
+          return {
+            ...subject,
+            flashCardCount: flashcards.length
+          };
+        })
+      );
+
+      res.json(subjectsWithFlashCardCounts);
+    } catch (error) {
+      console.error("Error getting subjects:", error);
+      res.status(500).json({ message: "Failed to get subjects" });
+    }
+  });
+
+  app.post("/api/subjects", requireFirebaseAuth, async (req, res) => {
+    try {
+      const user = req.user;
+      const isAdmin = user.role === 'admin' || user.role === 'super_admin';
+
+      if (!isAdmin) {
+        return res.status(403).json({ message: "Only admins can create subjects" });
+      }
+
+      const validatedData = insertSubjectSchema.parse(req.body);
+      const subject = await storage.createSubject(validatedData);
+      res.json(subject);
+    } catch (error) {
+      console.error("Error creating subject:", error);
+      res.status(400).json({ message: "Failed to create subject" });
+    }
+  });
+
+  app.put("/api/subjects/:id", requireFirebaseAuth, async (req, res) => {
+    try {
+      const user = req.user;
+      const isAdmin = user.role === 'admin' || user.role === 'super_admin';
+
+      if (!isAdmin) {
+        return res.status(403).json({ message: "Only admins can update subjects" });
+      }
+
+      const updates = req.body;
+      const subject = await storage.updateSubject(req.params.id, updates);
+      res.json(subject);
+    } catch (error) {
+      console.error("Error updating subject:", error);
+      res.status(400).json({ message: "Failed to update subject" });
+    }
+  });
+
+  app.delete("/api/subjects/:id", requireFirebaseAuth, async (req, res) => {
+    try {
+      const user = req.user;
+      const isAdmin = user.role === 'admin' || user.role === 'super_admin';
+
+      if (!isAdmin) {
+        return res.status(403).json({ message: "Only admins can delete subjects" });
+      }
+
+      const subjectId = req.params.id;
+
+      // Step 1: Delete all flashcards for this subject
+      const flashcards = await storage.getFlashCards(subjectId);
+      for (const flashcard of flashcards) {
+        await storage.deleteFlashCard(flashcard.id);
+      }
+
+      // Step 2: Delete the subject itself
+      await storage.deleteSubject(subjectId);
+
+      res.json({
+        message: "Subject deleted successfully",
+        deletedFlashcardsCount: flashcards.length
+      });
+    } catch (error) {
+      console.error("Error deleting subject:", error);
+      res.status(500).json({ message: "Failed to delete subject" });
+    }
+  });
+
+  // Flash Card Routes
+  app.get("/api/flashcards", async (req, res) => {
+    try {
+      const subjectId = req.query.subjectId as string | undefined;
+      const flashCards = await storage.getFlashCards(subjectId);
+      res.json(flashCards);
+    } catch (error) {
+      console.error("Error getting flash cards:", error);
+      res.status(500).json({ message: "Failed to get flash cards" });
+    }
+  });
+
+  app.post("/api/flashcards", requireFirebaseAuth, async (req, res) => {
+    try {
+      const user = req.user;
+      const isAdmin = user.role === 'admin' || user.role === 'super_admin';
+
+      if (!isAdmin) {
+        return res.status(403).json({ message: "Only admins can create flash cards" });
+      }
+
+      const validatedData = insertFlashCardSchema.parse(req.body);
+      const flashCard = await storage.createFlashCard(validatedData);
+      res.json(flashCard);
+    } catch (error) {
+      console.error("Error creating flash card:", error);
+      res.status(400).json({ message: "Failed to create flash card" });
+    }
+  });
+
+  app.put("/api/flashcards/:id", requireFirebaseAuth, async (req, res) => {
+    try {
+      const user = req.user;
+      const isAdmin = user.role === 'admin' || user.role === 'super_admin';
+
+      if (!isAdmin) {
+        return res.status(403).json({ message: "Only admins can update flash cards" });
+      }
+
+      const validatedData = insertFlashCardSchema.partial().parse(req.body);
+      const flashCard = await storage.updateFlashCard(req.params.id, validatedData);
+      res.json(flashCard);
+    } catch (error) {
+      console.error("Error updating flash card:", error);
+      res.status(400).json({ message: "Failed to update flash card" });
+    }
+  });
+
+  app.delete("/api/flashcards/:id", requireFirebaseAuth, async (req, res) => {
+    try {
+      const user = req.user;
+      const isAdmin = user.role === 'admin' || user.role === 'super_admin';
+
+      if (!isAdmin) {
+        return res.status(403).json({ message: "Only admins can delete flash cards" });
+      }
+
+      await storage.deleteFlashCard(req.params.id);
+      res.json({ message: "Flash card deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting flash card:", error);
+      res.status(500).json({ message: "Failed to delete flash card" });
+    }
+  });
+
+  // Flashcard image upload endpoint
+  app.post("/api/flashcards/upload-image", requireFirebaseAuth, upload.single('image'), async (req, res) => {
+    try {
+      console.log('[FlashCard Upload] Starting image upload process...');
+      const user = req.user;
+      const isAdmin = user.role === 'admin' || user.role === 'super_admin';
+      if (!isAdmin) {
+        console.log('[FlashCard Upload] Access denied - user is not admin');
+        return res.status(403).json({ message: "Only admins can upload flashcard images" });
+      }
+
+      if (!req.file) {
+        console.log('[FlashCard Upload] No file provided in request');
+        return res.status(400).json({ message: "No image file provided" });
+      }
+
+      console.log('[FlashCard Upload] File details:', {
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size
+      });
+
+      try {
+        const result = await imageService.uploadFlashCardImage(
+          req.file.buffer,
+          req.file.originalname,
+          req.file.mimetype,
+          user.id
+        );
+
+        console.log('[FlashCard Upload] Upload successful, returning:', result);
+        res.json(result);
+      } catch (storageError) {
+        console.error('[FlashCard Upload] Firebase Storage error:', storageError);
+        // Fallback: return a temporary data URL for testing
+        const base64 = req.file.buffer.toString('base64');
+        const dataUrl = `data:${req.file.mimetype};base64,${base64}`;
+        console.log('[FlashCard Upload] Returning fallback data URL');
+        res.json({ url: dataUrl });
+      }
+    } catch (error) {
+      console.error("[FlashCard Upload] Error uploading flashcard image:", error);
+      console.error("[FlashCard Upload] Error stack:", error.stack);
+      res.status(500).json({ message: "Failed to upload flashcard image", error: error.message });
+    }
+  });
+
+  // Student assignment management endpoints
+
+  // Assign student to classroom
+  app.post("/api/classrooms/:classroomId/students", requireFirebaseAuth, async (req, res) => {
+    try {
+      const user = req.user;
+      const isAdmin = user.role === 'admin' || user.role === 'super_admin';
+
+      if (!isAdmin) {
+        return res.status(403).json({ message: "Only admins can assign students to classrooms" });
+      }
+
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: "Student email is required" });
+      }
+
+      // Find user by email
+      const student = await storage.getUserByEmail(email.trim());
+      if (!student) {
+        return res.status(404).json({ message: "Student not found with this email" });
+      }
+
+      const assignment = await storage.addClassroomStudent(req.params.classroomId, student.id);
+      res.json(assignment);
+    } catch (error) {
+      console.error("Error assigning student to classroom:", error);
+      res.status(500).json({ message: "Failed to assign student to classroom" });
+    }
+  });
+
+  // Remove student from classroom
+  app.delete("/api/classrooms/:classroomId/students/:studentId", requireFirebaseAuth, async (req, res) => {
+    try {
+      const user = req.user;
+      const isAdmin = user.role === 'admin' || user.role === 'super_admin';
+
+      if (!isAdmin) {
+        return res.status(403).json({ message: "Only admins can remove students from classrooms" });
+      }
+
+      await storage.removeClassroomStudent(req.params.classroomId, req.params.studentId);
+      res.json({ message: "Student removed from classroom successfully" });
+    } catch (error) {
+      console.error("Error removing student from classroom:", error);
+      res.status(500).json({ message: "Failed to remove student from classroom" });
+    }
+  });
+
+  // Get students in a classroom
+  app.get("/api/classrooms/:classroomId/students", requireFirebaseAuth, async (req, res) => {
+    try {
+      const students = await storage.getClassroomStudents(req.params.classroomId);
+      res.json(students);
+    } catch (error) {
+      console.error("Error getting classroom students:", error);
+      res.status(500).json({ message: "Failed to get classroom students" });
+    }
+  });
+
+  // Get classrooms for a student
+  app.get("/api/students/:studentId/classrooms", requireFirebaseAuth, async (req, res) => {
+    try {
+      const user = req.user;
+
+      // Students can only access their own classrooms, admins can access any
+      if (user.id !== req.params.studentId && user.role !== 'admin' && user.role !== 'super_admin') {
+        return res.status(403).json({ message: "You can only access your own classrooms" });
+      }
+
+      // For now, we'll get all classrooms and filter by student assignments
+      // This should be optimized with a proper query in the future
+      const allClassrooms = await storage.getClassrooms();
+      const studentClassrooms = [];
+
+      for (const classroom of allClassrooms) {
+        const students = await storage.getClassroomStudents(classroom.id);
+        if (students.some(s => s.studentId === req.params.studentId)) {
+          studentClassrooms.push(classroom);
+        }
+      }
+
+      res.json(studentClassrooms);
+    } catch (error) {
+      console.error("Error getting student classrooms:", error);
+      res.status(500).json({ message: "Failed to get student classrooms" });
+    }
+  });
+
+  // Admin assignment management endpoints
+
+  // Assign admin to classroom
+  app.post("/api/classrooms/:classroomId/admins", requireFirebaseAuth, async (req, res) => {
+    try {
+      const user = req.user;
+      if (user.role !== 'super_admin') {
+        return res.status(403).json({ message: "Only super admins can assign admins to classrooms" });
+      }
+
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: "Admin email is required" });
+      }
+
+      // Find user by email
+      const admin = await storage.getUserByEmail(email.trim());
+      if (!admin) {
+        return res.status(404).json({ message: "Admin not found with this email" });
+      }
+
+      const assignment = await storage.addClassroomAdmin(req.params.classroomId, admin.id);
+      res.json(assignment);
+    } catch (error) {
+      console.error("Error assigning admin to classroom:", error);
+      res.status(500).json({ message: "Failed to assign admin to classroom" });
+    }
+  });
+
+  // Remove admin from classroom
+  app.delete("/api/classrooms/:classroomId/admins/:adminId", requireFirebaseAuth, async (req, res) => {
+    try {
+      const user = req.user;
+      if (user.role !== 'super_admin') {
+        return res.status(403).json({ message: "Only super admins can remove admins from classrooms" });
+      }
+
+      await storage.removeClassroomAdmin(req.params.classroomId, req.params.adminId);
+      res.json({ message: "Admin removed from classroom successfully" });
+    } catch (error) {
+      console.error("Error removing admin from classroom:", error);
+      res.status(500).json({ message: "Failed to remove admin from classroom" });
+    }
+  });
+
+  // Get admins in a classroom
+  app.get("/api/classrooms/:classroomId/admins", requireFirebaseAuth, async (req, res) => {
+    try {
+      const admins = await storage.getClassroomAdmins(req.params.classroomId);
+      res.json(admins);
+    } catch (error) {
+      console.error("Error getting classroom admins:", error);
+      res.status(500).json({ message: "Failed to get classroom admins" });
+    }
+  });
+
+  // Copy subject to classroom
+  app.post("/api/classrooms/:classroomId/subjects", requireFirebaseAuth, async (req, res) => {
+    try {
+      const { classroomId } = req.params;
+      const { subjectId } = req.body;
+      const user = req.user;
+
+      if (!subjectId) {
+        return res.status(400).json({ message: "Subject ID is required" });
+      }
+
+      // Check if user can manage this classroom
+      const isAdmin = user.role === 'admin' || user.role === 'super_admin';
+      if (!isAdmin) {
+        const classroom = await storage.getClassroom(classroomId);
+        if (!classroom || classroom.ownerId !== user.id) {
+          return res.status(403).json({ message: "Not authorized to manage this classroom" });
+        }
+      }
+
+      // Check if subject exists
+      const sourceSubject = await storage.getSubject(subjectId);
+      if (!sourceSubject) {
+        return res.status(404).json({ message: "Subject not found" });
+      }
+
+      // Check if target classroom exists
+      const targetClassroom = await storage.getClassroom(classroomId);
+      if (!targetClassroom) {
+        return res.status(404).json({ message: "Classroom not found" });
+      }
+
+      // Check if subject is already linked to this classroom
+      const existingLink = await storage.isSubjectLinkedToClassroom(subjectId, classroomId);
+      if (existingLink) {
+        return res.status(400).json({ message: "Subject is already added to this classroom" });
+      }
+
+      // Link the subject to the classroom (no duplication)
+      await storage.linkSubjectToClassroom(subjectId, classroomId);
+
+      res.json({
+        message: "Subject added to classroom successfully",
+        subject: sourceSubject
+      });
+    } catch (error) {
+      console.error("Error copying subject to classroom:", error);
+      res.status(500).json({ message: "Failed to copy subject" });
+    }
+  });
+
+  // Remove subject from classroom
+  app.delete("/api/classrooms/:classroomId/subjects/:subjectId", requireFirebaseAuth, async (req, res) => {
+    try {
+      const { classroomId, subjectId } = req.params;
+      const user = req.user;
+
+      // Check if user can manage this classroom
+      const isAdmin = user.role === 'admin' || user.role === 'super_admin';
+      if (!isAdmin) {
+        const classroom = await storage.getClassroom(classroomId);
+        if (!classroom || classroom.ownerId !== user.id) {
+          return res.status(403).json({ message: "Not authorized to manage this classroom" });
+        }
+      }
+
+      // Check if subject exists and belongs to this classroom
+      const subject = await storage.getSubject(subjectId);
+      if (!subject) {
+        return res.status(404).json({ message: "Subject not found" });
+      }
+
+      if (subject.classroomId !== classroomId) {
+        return res.status(400).json({ message: "Subject does not belong to this classroom" });
+      }
+
+      // Get all flashcards for this subject before deleting
+      const flashcards = await storage.getFlashCards(subjectId);
+
+      // Delete all flashcards first
+      for (const flashcard of flashcards) {
+        await storage.deleteFlashCard(flashcard.id);
+      }
+
+      // Delete the subject
+      await storage.deleteSubject(subjectId);
+
+      res.json({
+        message: "Subject removed successfully",
+        deletedFlashcardsCount: flashcards.length
+      });
+    } catch (error) {
+      console.error("Error removing subject from classroom:", error);
+      res.status(500).json({ message: "Failed to remove subject" });
     }
   });
 

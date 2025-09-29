@@ -1,13 +1,15 @@
 import { db, COLLECTIONS } from './firebase-config';
 import { IStorage } from './storage';
-import type { 
+import type {
   User, InsertUser, WheelSection, InsertWheelSection, SpinResult, InsertSpinResult,
   Campaign, InsertCampaign, DiceCampaign, DiceFace, DiceResult,
   InsertDiceCampaign, InsertDiceFace, InsertDiceResult,
   ThreeDiceCampaign, ThreeDiceFace, ThreeDiceResult,
-  InsertThreeDiceCampaign, InsertThreeDiceFace, InsertThreeDiceResult 
+  InsertThreeDiceCampaign, InsertThreeDiceFace, InsertThreeDiceResult,
+  Classroom, InsertClassroom, Subject, InsertSubject, FlashCard, InsertFlashCard,
+  ClassroomAdmin, ClassroomStudent, StudentProgress, InsertStudentProgress
 } from "@shared/schema";
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, FieldPath } from 'firebase-admin/firestore';
 
 export class FirebaseStorage implements IStorage {
   
@@ -736,5 +738,325 @@ export class FirebaseStorage implements IStorage {
     await this.clearThreeDiceResults(campaignId);
     
     return this.getThreeDiceCampaign(campaignId) as Promise<ThreeDiceCampaign>;
+  }
+
+  // ===============================
+  // PERIODIC TABLE LEARNING SYSTEM
+  // ===============================
+
+  // Classroom methods
+  async getClassrooms(): Promise<Classroom[]> {
+    console.log("=== Firebase Storage getClassrooms ===");
+    console.log("Collection name:", COLLECTIONS.CLASSROOMS);
+
+    try {
+      const snapshot = await db.collection(COLLECTIONS.CLASSROOMS).get();
+      console.log("Snapshot size:", snapshot.size);
+      console.log("Snapshot empty:", snapshot.empty);
+
+      const classrooms = snapshot.docs.map(doc => {
+        const data = { id: doc.id, ...doc.data() } as Classroom;
+        console.log("Found classroom:", JSON.stringify(data, null, 2));
+        return data;
+      });
+
+      console.log("Total classrooms retrieved:", classrooms.length);
+      return classrooms;
+    } catch (error) {
+      console.error("Error in getClassrooms:", error);
+      console.error("Error stack:", error.stack);
+      throw error;
+    }
+  }
+
+  async getClassroom(id: string): Promise<Classroom | undefined> {
+    const doc = await db.collection(COLLECTIONS.CLASSROOMS).doc(id).get();
+    if (!doc.exists) return undefined;
+    return { id: doc.id, ...doc.data() } as Classroom;
+  }
+
+  async createClassroom(classroom: InsertClassroom): Promise<Classroom> {
+    console.log("=== Firebase Storage createClassroom ===");
+    console.log("Collection name:", COLLECTIONS.CLASSROOMS);
+    console.log("Input classroom data:", JSON.stringify(classroom, null, 2));
+
+    const documentData = {
+      ...classroom,
+      isActive: true,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    console.log("Document data to save:", JSON.stringify(documentData, null, 2));
+
+    try {
+      console.log("Adding document to collection...");
+      const docRef = await db.collection(COLLECTIONS.CLASSROOMS).add(documentData);
+      console.log("Document added with ID:", docRef.id);
+
+      console.log("Retrieving created classroom...");
+      const createdClassroom = await this.getClassroom(docRef.id) as Classroom;
+      console.log("Retrieved classroom:", JSON.stringify(createdClassroom, null, 2));
+
+      return createdClassroom;
+    } catch (error) {
+      console.error("Error in createClassroom:", error);
+      console.error("Error stack:", error.stack);
+      throw error;
+    }
+  }
+
+  async updateClassroom(id: string, updates: Partial<Classroom>): Promise<Classroom> {
+    await db.collection(COLLECTIONS.CLASSROOMS).doc(id).update({
+      ...updates,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    return this.getClassroom(id) as Promise<Classroom>;
+  }
+
+  async deleteClassroom(id: string): Promise<void> {
+    await db.collection(COLLECTIONS.CLASSROOMS).doc(id).delete();
+  }
+
+  // Classroom admin methods (stub implementations)
+  async addClassroomAdmin(classroomId: string, adminId: string): Promise<ClassroomAdmin> {
+    const docRef = await db.collection(COLLECTIONS.CLASSROOM_ADMINS).add({
+      classroomId,
+      adminId,
+      assignedAt: FieldValue.serverTimestamp(),
+    });
+
+    const doc = await docRef.get();
+    return { id: doc.id, ...doc.data() } as ClassroomAdmin;
+  }
+
+  async removeClassroomAdmin(classroomId: string, adminId: string): Promise<void> {
+    const snapshot = await db.collection(COLLECTIONS.CLASSROOM_ADMINS)
+      .where('classroomId', '==', classroomId)
+      .where('adminId', '==', adminId)
+      .get();
+
+    const batch = db.batch();
+    snapshot.docs.forEach(doc => batch.delete(doc.ref));
+    await batch.commit();
+  }
+
+  async getClassroomAdmins(classroomId: string): Promise<ClassroomAdmin[]> {
+    const snapshot = await db.collection(COLLECTIONS.CLASSROOM_ADMINS)
+      .where('classroomId', '==', classroomId)
+      .get();
+
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClassroomAdmin));
+  }
+
+  // Classroom student methods (stub implementations)
+  async addClassroomStudent(classroomId: string, studentId: string): Promise<ClassroomStudent> {
+    const docRef = await db.collection(COLLECTIONS.CLASSROOM_STUDENTS).add({
+      classroomId,
+      studentId,
+      enrolledAt: FieldValue.serverTimestamp(),
+    });
+
+    const doc = await docRef.get();
+    return { id: doc.id, ...doc.data() } as ClassroomStudent;
+  }
+
+  async removeClassroomStudent(classroomId: string, studentId: string): Promise<void> {
+    const snapshot = await db.collection(COLLECTIONS.CLASSROOM_STUDENTS)
+      .where('classroomId', '==', classroomId)
+      .where('studentId', '==', studentId)
+      .get();
+
+    const batch = db.batch();
+    snapshot.docs.forEach(doc => batch.delete(doc.ref));
+    await batch.commit();
+  }
+
+  async getClassroomStudents(classroomId: string): Promise<ClassroomStudent[]> {
+    const snapshot = await db.collection(COLLECTIONS.CLASSROOM_STUDENTS)
+      .where('classroomId', '==', classroomId)
+      .get();
+
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClassroomStudent));
+  }
+
+  // Subject methods
+  async getSubjects(classroomId?: string): Promise<Subject[]> {
+    if (classroomId) {
+      // If classroomId is provided, get subjects associated with that classroom
+      // through the classroomSubjects junction table
+      const classroomSubjectsSnapshot = await db
+        .collection(COLLECTIONS.CLASSROOM_SUBJECTS)
+        .where('classroomId', '==', classroomId)
+        .get();
+
+      const subjectIds = classroomSubjectsSnapshot.docs.map(doc => doc.data().subjectId);
+
+      if (subjectIds.length === 0) {
+        return [];
+      }
+
+      // Firebase 'in' query limit is 10, so we need to batch if there are more
+      const subjects: Subject[] = [];
+      for (let i = 0; i < subjectIds.length; i += 10) {
+        const batch = subjectIds.slice(i, i + 10);
+        const batchSnapshot = await db
+          .collection(COLLECTIONS.SUBJECTS)
+          .where(FieldPath.documentId(), 'in', batch)
+          .get();
+
+        subjects.push(...batchSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject)));
+      }
+
+      return subjects;
+    } else {
+      // If no classroomId provided, return all subjects
+      const snapshot = await db.collection(COLLECTIONS.SUBJECTS).get();
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject));
+    }
+  }
+
+  async getSubject(id: string): Promise<Subject | undefined> {
+    const doc = await db.collection(COLLECTIONS.SUBJECTS).doc(id).get();
+    if (!doc.exists) return undefined;
+    return { id: doc.id, ...doc.data() } as Subject;
+  }
+
+  async createSubject(subject: InsertSubject): Promise<Subject> {
+    const docRef = await db.collection(COLLECTIONS.SUBJECTS).add({
+      ...subject,
+      isActive: true,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    return this.getSubject(docRef.id) as Promise<Subject>;
+  }
+
+  async updateSubject(id: string, updates: Partial<Subject>): Promise<Subject> {
+    await db.collection(COLLECTIONS.SUBJECTS).doc(id).update({
+      ...updates,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    return this.getSubject(id) as Promise<Subject>;
+  }
+
+  async deleteSubject(id: string): Promise<void> {
+    await db.collection(COLLECTIONS.SUBJECTS).doc(id).delete();
+  }
+
+  // Flash card methods (stub implementations)
+  async getFlashCards(subjectId?: string): Promise<FlashCard[]> {
+    let query: any = db.collection(COLLECTIONS.FLASH_CARDS);
+
+    if (subjectId) {
+      query = query.where('subjectId', '==', subjectId);
+    }
+
+    const snapshot = await query.get();
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FlashCard));
+  }
+
+  async getFlashCard(id: string): Promise<FlashCard | undefined> {
+    const doc = await db.collection(COLLECTIONS.FLASH_CARDS).doc(id).get();
+    if (!doc.exists) return undefined;
+    return { id: doc.id, ...doc.data() } as FlashCard;
+  }
+
+  async createFlashCard(flashCard: InsertFlashCard): Promise<FlashCard> {
+    const docRef = await db.collection(COLLECTIONS.FLASH_CARDS).add({
+      ...flashCard,
+      isActive: true,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    return this.getFlashCard(docRef.id) as Promise<FlashCard>;
+  }
+
+  async updateFlashCard(id: string, updates: Partial<FlashCard>): Promise<FlashCard> {
+    await db.collection(COLLECTIONS.FLASH_CARDS).doc(id).update({
+      ...updates,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    return this.getFlashCard(id) as Promise<FlashCard>;
+  }
+
+  async deleteFlashCard(id: string): Promise<void> {
+    await db.collection(COLLECTIONS.FLASH_CARDS).doc(id).delete();
+  }
+
+  // Student progress methods (stub implementations)
+  async getStudentProgress(studentId: string, subjectId?: string): Promise<StudentProgress[]> {
+    let query: any = db.collection(COLLECTIONS.STUDENT_PROGRESS)
+      .where('studentId', '==', studentId);
+
+    if (subjectId) {
+      // We'd need to join with flash cards to filter by subject, for now return all
+    }
+
+    const snapshot = await query.get();
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StudentProgress));
+  }
+
+  async updateStudentProgress(studentId: string, flashCardId: string, progress: InsertStudentProgress): Promise<StudentProgress> {
+    const existingSnapshot = await db.collection(COLLECTIONS.STUDENT_PROGRESS)
+      .where('studentId', '==', studentId)
+      .where('flashCardId', '==', flashCardId)
+      .limit(1)
+      .get();
+
+    if (!existingSnapshot.empty) {
+      const doc = existingSnapshot.docs[0];
+      await doc.ref.update({
+        ...progress,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      const updatedDoc = await doc.ref.get();
+      return { id: updatedDoc.id, ...updatedDoc.data() } as StudentProgress;
+    } else {
+      const docRef = await db.collection(COLLECTIONS.STUDENT_PROGRESS).add({
+        ...progress,
+        studentId,
+        flashCardId,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+
+      const doc = await docRef.get();
+      return { id: doc.id, ...doc.data() } as StudentProgress;
+    }
+  }
+
+  // Subject-Classroom association methods
+  async linkSubjectToClassroom(subjectId: string, classroomId: string): Promise<void> {
+    await db.collection(COLLECTIONS.CLASSROOM_SUBJECTS).add({
+      classroomId,
+      subjectId,
+      assignedAt: FieldValue.serverTimestamp(),
+    });
+  }
+
+  async unlinkSubjectFromClassroom(subjectId: string, classroomId: string): Promise<void> {
+    const snapshot = await db.collection(COLLECTIONS.CLASSROOM_SUBJECTS)
+      .where('classroomId', '==', classroomId)
+      .where('subjectId', '==', subjectId)
+      .get();
+
+    const batch = db.batch();
+    snapshot.docs.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+
+    await batch.commit();
+  }
+
+  async isSubjectLinkedToClassroom(subjectId: string, classroomId: string): Promise<boolean> {
+    const snapshot = await db.collection(COLLECTIONS.CLASSROOM_SUBJECTS)
+      .where('classroomId', '==', classroomId)
+      .where('subjectId', '==', subjectId)
+      .limit(1)
+      .get();
+
+    return !snapshot.empty;
   }
 }

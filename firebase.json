@@ -22,7 +22,7 @@
     }
   ],
   "apphosting": {
-    "backendId": "gamehub-backend",
+    "backendId": "eduhub-backend",
     "rootDir": "/",
     "ignore": [
       "node_modules",

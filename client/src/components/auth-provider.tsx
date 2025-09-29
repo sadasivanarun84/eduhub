@@ -63,14 +63,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
             }
           } catch (backendError) {
             console.warn('Backend not available, creating temporary user:', backendError);
-            // Create temporary user from Firebase data
+            // Create temporary user from Firebase data with proper role assignment
+            const email = firebaseUser.email || '';
+            let role: 'user' | 'admin' | 'super_admin' = 'user';
+
+            // Set super admin for specified emails
+            if (email === 'sadasivanarun84@gmail.com' || email === 'Edthrustory@gmail.com') {
+              role = 'super_admin';
+            }
+
             setUser({
               id: firebaseUser.uid,
-              email: firebaseUser.email || '',
+              email: email,
               googleId: firebaseUser.uid,
               displayName: firebaseUser.displayName || null,
               profilePicture: firebaseUser.photoURL || null,
-              role: 'user' as const,
+              role: role,
+              isActive: true,
               createdAt: new Date(),
               lastLoginAt: new Date(),
             });
