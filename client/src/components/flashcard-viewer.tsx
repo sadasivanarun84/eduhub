@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/components/auth-provider";
 import { ArrowLeft, ArrowRight, RotateCcw, BookOpen } from "lucide-react";
+import { apiGet } from "@/lib/api-utils";
 
 interface FlashCard {
   id: string;
@@ -52,7 +53,7 @@ export function FlashCardViewer({ open, onOpenChange, subjectId, subjectName }: 
     setLoading(true);
     try {
       const idToken = await firebaseUser.getIdToken();
-      const response = await fetch(`/api/flashcards?subjectId=${subjectId}`, {
+      const response = await apiGet(`/api/flashcards?subjectId=${subjectId}`, {
         headers: {
           'Authorization': `Bearer ${idToken}`,
         },

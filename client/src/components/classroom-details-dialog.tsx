@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/components/auth-provider";
 import { FlashCardViewer } from "@/components/flashcard-viewer";
 import { Users, BookOpen, UserPlus, Trash2, GraduationCap } from "lucide-react";
+import { apiGet, apiPost, apiDelete, getApiUrl } from "@/lib/api-utils";
 
 interface ClassroomDetailsDialogProps {
   open: boolean;
@@ -71,7 +72,7 @@ export function ClassroomDetailsDialog({ open, onOpenChange, classroomId }: Clas
 
     try {
       const idToken = await firebaseUser.getIdToken();
-      const response = await fetch('/api/subjects', {
+      const response = await apiGet('/api/subjects', {
         headers: {
           'Authorization': `Bearer ${idToken}`,
         },
@@ -91,7 +92,7 @@ export function ClassroomDetailsDialog({ open, onOpenChange, classroomId }: Clas
     setLoading(true);
     try {
       const idToken = await firebaseUser.getIdToken();
-      const response = await fetch(`/api/classrooms/${classroomId}`, {
+      const response = await apiGet(`/api/classrooms/${classroomId}`, {
         headers: {
           'Authorization': `Bearer ${idToken}`,
         },
@@ -112,14 +113,8 @@ export function ClassroomDetailsDialog({ open, onOpenChange, classroomId }: Clas
     if (!classroomId || !newAdminEmail.trim()) return;
 
     try {
-      const response = await fetch(`/api/classrooms/${classroomId}/admins`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: newAdminEmail.trim(),
-        }),
+      const response = await apiPost(`/api/classrooms/${classroomId}/admins`, {
+        email: newAdminEmail.trim(),
       });
 
       if (!response.ok) {
@@ -137,14 +132,8 @@ export function ClassroomDetailsDialog({ open, onOpenChange, classroomId }: Clas
     if (!classroomId || !newStudentEmail.trim()) return;
 
     try {
-      const response = await fetch(`/api/classrooms/${classroomId}/students`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: newStudentEmail.trim(),
-        }),
+      const response = await apiPost(`/api/classrooms/${classroomId}/students`, {
+        email: newStudentEmail.trim(),
       });
 
       if (!response.ok) {
@@ -162,9 +151,7 @@ export function ClassroomDetailsDialog({ open, onOpenChange, classroomId }: Clas
     if (!classroomId) return;
 
     try {
-      const response = await fetch(`/api/classrooms/${classroomId}/admins/${adminId}`, {
-        method: "DELETE",
-      });
+      const response = await apiDelete(`/api/classrooms/${classroomId}/admins/${adminId}`);
 
       if (!response.ok) {
         throw new Error("Failed to remove admin");
@@ -180,9 +167,7 @@ export function ClassroomDetailsDialog({ open, onOpenChange, classroomId }: Clas
     if (!classroomId) return;
 
     try {
-      const response = await fetch(`/api/classrooms/${classroomId}/students/${studentId}`, {
-        method: "DELETE",
-      });
+      const response = await apiDelete(`/api/classrooms/${classroomId}/students/${studentId}`);
 
       if (!response.ok) {
         throw new Error("Failed to remove student");
@@ -204,15 +189,12 @@ export function ClassroomDetailsDialog({ open, onOpenChange, classroomId }: Clas
 
     try {
       const idToken = await firebaseUser.getIdToken();
-      const response = await fetch(`/api/classrooms/${classroomId}/subjects`, {
-        method: "POST",
+      const response = await apiPost(`/api/classrooms/${classroomId}/subjects`, {
+        subjectId: selectedSubjectToAdd,
+      }, {
         headers: {
-          "Content-Type": "application/json",
           "Authorization": `Bearer ${idToken}`,
         },
-        body: JSON.stringify({
-          subjectId: selectedSubjectToAdd,
-        }),
       });
 
       if (!response.ok) {
@@ -234,8 +216,7 @@ export function ClassroomDetailsDialog({ open, onOpenChange, classroomId }: Clas
 
     try {
       const idToken = await firebaseUser.getIdToken();
-      const response = await fetch(`/api/classrooms/${classroomId}/subjects/${subjectId}`, {
-        method: "DELETE",
+      const response = await apiDelete(`/api/classrooms/${classroomId}/subjects/${subjectId}`, {
         headers: {
           "Authorization": `Bearer ${idToken}`,
         },

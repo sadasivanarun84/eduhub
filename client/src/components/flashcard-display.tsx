@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Edit, Trash2, Plus, RotateCcw } from "lucide-react";
 import { CreateFlashCardDialog } from "./create-flashcard-dialog";
 import { useAuth } from "./auth-provider";
+import { apiGet, apiDelete } from "@/lib/api-utils";
 
 interface FlashCard {
   id: string;
@@ -35,7 +36,7 @@ export function FlashCardDisplay({ subjectId, subjectName }: FlashCardDisplayPro
     if (!subjectId) return;
 
     try {
-      const response = await fetch(`/api/flashcards?subjectId=${subjectId}`);
+      const response = await apiGet(`/api/flashcards?subjectId=${subjectId}`);
       if (response.ok) {
         const data = await response.json();
         setFlashCards(data.sort((a: FlashCard, b: FlashCard) => a.order - b.order));
@@ -56,8 +57,7 @@ export function FlashCardDisplay({ subjectId, subjectName }: FlashCardDisplayPro
 
     try {
       const idToken = await firebaseUser.getIdToken();
-      const response = await fetch(`/api/flashcards/${id}`, {
-        method: "DELETE",
+      const response = await apiDelete(`/api/flashcards/${id}`, {
         headers: {
           "Authorization": `Bearer ${idToken}`,
         },

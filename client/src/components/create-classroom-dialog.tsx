@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/components/auth-provider";
+import { apiPost } from "@/lib/api-utils";
 
 interface CreateClassroomDialogProps {
   open: boolean;
@@ -27,17 +28,14 @@ export function CreateClassroomDialog({ open, onOpenChange, onClassroomCreated }
       // Get Firebase ID token for authentication
       const idToken = await firebaseUser.getIdToken();
 
-      const response = await fetch("/api/classrooms", {
-        method: "POST",
+      const response = await apiPost("/api/classrooms", {
+        name: name.trim(),
+        description: description.trim() || null,
+        ownerId: user.id,
+      }, {
         headers: {
-          "Content-Type": "application/json",
           "Authorization": `Bearer ${idToken}`,
         },
-        body: JSON.stringify({
-          name: name.trim(),
-          description: description.trim() || null,
-          ownerId: user.id,
-        }),
       });
 
       if (!response.ok) {

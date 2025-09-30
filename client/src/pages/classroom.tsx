@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FlashCardViewer } from "@/components/flashcard-viewer";
 import { ArrowLeft, BookOpen, Users, Plus, Trash2, UserPlus } from "lucide-react";
+import { apiGet, apiPost, apiDelete } from "@/lib/api-utils";
 
 interface ClassroomDetails {
   id: string;
@@ -61,7 +62,7 @@ export default function ClassroomPage() {
 
     try {
       const idToken = await firebaseUser.getIdToken();
-      const response = await fetch('/api/subjects', {
+      const response = await apiGet('/api/subjects', {
         headers: {
           'Authorization': `Bearer ${idToken}`,
         },
@@ -81,7 +82,7 @@ export default function ClassroomPage() {
     setLoading(true);
     try {
       const idToken = await firebaseUser.getIdToken();
-      const response = await fetch(`/api/classrooms/${classroomId}`, {
+      const response = await apiGet(`/api/classrooms/${classroomId}`, {
         headers: {
           'Authorization': `Bearer ${idToken}`,
         },
@@ -103,15 +104,12 @@ export default function ClassroomPage() {
 
     try {
       const idToken = await firebaseUser.getIdToken();
-      const response = await fetch(`/api/classrooms/${classroomId}/subjects`, {
-        method: "POST",
+      const response = await apiPost(`/api/classrooms/${classroomId}/subjects`, {
+        subjectId: selectedSubjectToAdd,
+      }, {
         headers: {
-          "Content-Type": "application/json",
           "Authorization": `Bearer ${idToken}`,
         },
-        body: JSON.stringify({
-          subjectId: selectedSubjectToAdd,
-        }),
       });
 
       if (!response.ok) {
@@ -133,8 +131,7 @@ export default function ClassroomPage() {
 
     try {
       const idToken = await firebaseUser.getIdToken();
-      const response = await fetch(`/api/classrooms/${classroomId}/subjects/${subjectId}`, {
-        method: "DELETE",
+      const response = await apiDelete(`/api/classrooms/${classroomId}/subjects/${subjectId}`, {
         headers: {
           "Authorization": `Bearer ${idToken}`,
         },

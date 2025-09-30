@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Settings, Trophy, Target, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { getApiUrl } from "@/lib/api-utils";
 import type { Campaign, InsertCampaign } from "@shared/schema";
 
 interface CampaignConfigProps {
@@ -95,7 +96,7 @@ export function CampaignConfig({ onCampaignUpdate }: CampaignConfigProps) {
   const resetCampaignMutation = useMutation({
     mutationFn: async () => {
       if (!activeCampaign) throw new Error("No active campaign");
-      const response = await fetch(`/api/campaigns/${activeCampaign.id}/reset`, {
+      const response = await fetch(getApiUrl(`/api/campaigns/${activeCampaign.id}/reset`), {
         method: 'POST',
         headers: {
           'Cache-Control': 'no-cache',

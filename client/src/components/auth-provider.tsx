@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { onAuthStateChanged, signInWithPopup, signOut, User as FirebaseUser } from 'firebase/auth';
 import { auth, googleProvider } from '@/lib/firebase';
+import { apiPost } from '@/lib/api-utils';
 import type { User } from '@shared/schema';
 
 interface AuthContextType {
@@ -47,13 +48,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           // Try to verify with our backend, fall back to temporary user if backend unavailable
           const apiUrl = import.meta.env.VITE_API_URL || '';
           try {
-            const response = await fetch(`${apiUrl}/auth/verify`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ idToken }),
-            });
+            const response = await apiPost(`${apiUrl}/auth/verify`, { idToken });
 
             if (response.ok) {
               const data = await response.json();

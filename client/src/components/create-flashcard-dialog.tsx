@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/components/auth-provider";
 import { Upload } from "lucide-react";
+import { apiPost, getApiUrl } from "@/lib/api-utils";
 
 interface CreateFlashCardDialogProps {
   open: boolean;
@@ -30,7 +31,7 @@ export function CreateFlashCardDialog({ open, onOpenChange, onFlashCardCreated, 
     formData.append('image', file);
 
     const idToken = await firebaseUser.getIdToken();
-    const response = await fetch('/api/flashcards/upload-image', {
+    const response = await fetch(getApiUrl('/api/flashcards/upload-image'), {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${idToken}`,
@@ -75,20 +76,17 @@ export function CreateFlashCardDialog({ open, onOpenChange, onFlashCardCreated, 
       // Get Firebase ID token for authentication
       const idToken = await firebaseUser.getIdToken();
 
-      const response = await fetch("/api/flashcards", {
-        method: "POST",
+      const response = await apiPost("/api/flashcards", {
+        subjectId,
+        frontContent: frontContent.trim(),
+        backContent: backContent.trim(),
+        frontImageUrl: frontImageUrl.trim() || null,
+        backImageUrl: backImageUrl.trim() || null,
+        createdById: user.id,
+      }, {
         headers: {
-          "Content-Type": "application/json",
           "Authorization": `Bearer ${idToken}`,
         },
-        body: JSON.stringify({
-          subjectId,
-          frontContent: frontContent.trim(),
-          backContent: backContent.trim(),
-          frontImageUrl: frontImageUrl.trim() || null,
-          backImageUrl: backImageUrl.trim() || null,
-          createdById: user.id,
-        }),
       });
 
       if (!response.ok) {
